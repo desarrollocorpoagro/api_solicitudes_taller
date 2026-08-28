@@ -1,0 +1,580 @@
+import { sequelize } from '../config/database';
+import Company from './Company.model';
+import User from './User.model';
+import UserCompany from './UserCompany.model';
+import FlotaVehicular from './FlotaVehicular.model';
+import CatalogoRepuesto from './CatalogoRepuesto.model';
+import OrdenServicio from './OrdenServicio.model';
+import OrdenArea from './OrdenArea.model';
+import SolicitudRepuesto from './SolicitudRepuesto.model';
+import SolicitudExterno from './SolicitudExterno.model';
+import Notificacion from './Notificacion.model';
+import Multimedia from './Multimedia.model';
+import FlotaOrdenServicioProfit from './FlotaOrdenServicioProfit.model';
+import VwFlotaVendedores from './VwFlotaVendedores.model';
+import VwFlotaArticulos from './VwFlotaArticulos.model';
+import DatabaseConnection from './DatabaseConnection.model';
+import RolePermission from './RolePermission.model';
+import UserPermission from './UserPermission.model';
+import { profitSequelize, initProfitDatabase, getProfitConnectionStatus } from '../config/profitDb';
+import { logger } from '../utils/logger';
+
+// Definición de Relaciones Multi-Tenant y de Órdenes
+User.hasMany(UserCompany, { foreignKey: 'userId', as: 'userCompanies' });
+UserCompany.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+Company.hasMany(UserCompany, { foreignKey: 'companyId', as: 'userCompanies' });
+UserCompany.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+User.hasMany(UserPermission, { foreignKey: 'userId', as: 'customPermissions', onDelete: 'CASCADE' });
+UserPermission.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+OrdenServicio.hasMany(OrdenArea, { foreignKey: 'ordenId', as: 'ordenesArea', onDelete: 'CASCADE' });
+OrdenArea.belongsTo(OrdenServicio, { foreignKey: 'ordenId', as: 'orden' });
+
+OrdenServicio.hasMany(SolicitudRepuesto, { foreignKey: 'ordenId', as: 'solicitudesRepuesto', onDelete: 'CASCADE' });
+SolicitudRepuesto.belongsTo(OrdenServicio, { foreignKey: 'ordenId', as: 'orden' });
+
+OrdenServicio.hasMany(SolicitudExterno, { foreignKey: 'ordenId', as: 'solicitudesExterno', onDelete: 'CASCADE' });
+SolicitudExterno.belongsTo(OrdenServicio, { foreignKey: 'ordenId', as: 'orden' });
+
+OrdenServicio.hasMany(Multimedia, { foreignKey: 'ordenId', as: 'archivosMultimedia', onDelete: 'SET NULL' });
+Multimedia.belongsTo(OrdenServicio, { foreignKey: 'ordenId', as: 'orden' });
+
+export {
+  sequelize,
+  profitSequelize,
+  initProfitDatabase,
+  getProfitConnectionStatus,
+  Company,
+  User,
+  UserCompany,
+  FlotaVehicular,
+  CatalogoRepuesto,
+  OrdenServicio,
+  OrdenArea,
+  SolicitudRepuesto,
+  SolicitudExterno,
+  Notificacion,
+  Multimedia,
+  FlotaOrdenServicioProfit,
+  VwFlotaVendedores,
+  VwFlotaArticulos,
+  DatabaseConnection,
+  RolePermission,
+  UserPermission,
+};
+
+/**
+ * Semilla inicial de datos para demostración y puesta en marcha inmediata.
+ */
+export const seedInitialData = async () => {
+  try {
+    // Sincronizar tablas
+    await sequelize.sync({ alter: true });
+
+    // 1. Semilla de Empresas (Tenants)
+    const companyCount = await Company.count();
+    let comp1: Company, comp2: Company, comp3: Company;
+
+    if (companyCount === 0) {
+      comp1 = await Company.create({
+        id: '11111111-1111-1111-1111-111111111111',
+        name: 'Transporte Andina C.A.',
+        taxId: 'J-30219482-1',
+        email: 'contacto@transporteandina.com',
+        phone: '+58 274 2441122',
+        isActive: true,
+      });
+
+      comp2 = await Company.create({
+        id: '22222222-2222-2222-2222-222222222222',
+        name: 'Agro Llanos C.A.',
+        taxId: 'J-11409281-3',
+        email: 'operaciones@agrollanos.com',
+        phone: '+58 247 3349911',
+        isActive: true,
+      });
+
+      comp3 = await Company.create({
+        id: '33333333-3333-3333-3333-333333333333',
+        name: 'Distribuidora Centro C.A.',
+        taxId: 'J-55028471-0',
+        email: 'logistica@distribuidoracentro.com',
+        phone: '+58 241 8712345',
+        isActive: true,
+      });
+      logger.info('[Seed] Empresas creadas exitosamente.');
+    } else {
+      [comp1, comp2, comp3] = (await Company.findAll({ limit: 3 })) as [Company, Company, Company];
+    }
+
+    // 2. Semilla de Usuarios y asignaciones de empresa
+    const userCount = await User.count();
+    if (userCount === 0) {
+      const admin = await User.create({
+        id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        fullName: 'Administrador San Luis',
+        email: 'admin@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 412 1112233',
+        role: 'ADMIN',
+        isActive: true,
+      });
+
+      const gerente = await User.create({
+        id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        fullName: 'Ing. Carlos Mendoza (Gerente Taller)',
+        email: 'gerente.taller@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 414 2223344',
+        role: 'GERENTE_TALLER',
+        isActive: true,
+      });
+
+      const flota = await User.create({
+        id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        fullName: 'Lic. Mariana Rojas (Responsable Flota)',
+        email: 'flota@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 416 3334455',
+        role: 'RESPONSABLE_FLOTA',
+        isActive: true,
+      });
+
+      const mecanico = await User.create({
+        id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+        fullName: 'José Ramírez (Técnico Mecánico)',
+        email: 'jose.ramirez@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 424 4445566',
+        role: 'MECANICO',
+        isActive: true,
+      });
+
+      const almacen = await User.create({
+        id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+        fullName: 'Pedro Morales (Almacén TLL-01)',
+        email: 'almacen@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 412 5556677',
+        role: 'ALMACENISTA',
+        isActive: true,
+      });
+
+      // Asignar usuarios a empresas con permisos
+      const allPermissions = [
+        { module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'close'] },
+        { module: 'fleet', actions: ['read', 'create', 'update'] },
+        { module: 'inventory', actions: ['read', 'dispatch', 'requisition'] },
+        { module: 'users', actions: ['read', 'create', 'update', 'delete'] },
+        { module: 'reports', actions: ['read', 'export'] },
+      ];
+
+      await UserCompany.bulkCreate([
+        { userId: admin.id, companyId: comp1.id, role: 'ADMIN', permissions: allPermissions },
+        { userId: admin.id, companyId: comp2.id, role: 'ADMIN', permissions: allPermissions },
+        { userId: admin.id, companyId: comp3.id, role: 'ADMIN', permissions: allPermissions },
+        { userId: gerente.id, companyId: comp1.id, role: 'GERENTE_TALLER', permissions: allPermissions },
+        { userId: flota.id, companyId: comp1.id, role: 'RESPONSABLE_FLOTA', permissions: allPermissions },
+        { userId: mecanico.id, companyId: comp1.id, role: 'MECANICO', permissions: [{ module: 'taller', actions: ['read', 'update'] }] },
+        { userId: almacen.id, companyId: comp1.id, role: 'ALMACENISTA', permissions: [{ module: 'inventory', actions: ['read', 'dispatch'] }] },
+      ]);
+
+      logger.info('[Seed] Usuarios y asignaciones creados exitosamente.');
+    }
+
+    // 3. Semilla de Flota Vehicular Multi-Tenant
+    const flotaCount = await FlotaVehicular.count();
+    if (flotaCount === 0) {
+      await FlotaVehicular.bulkCreate([
+        // Empresa 1: Transporte Andina C.A.
+        {
+          placa: 'A12BC3D',
+          companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
+          marca: 'Chevrolet NPR',
+          anio: 2019,
+          tipo: 'Camión 5t',
+          empresa: 'Transporte Andina C.A.',
+          cc: '3021',
+          km: 184320,
+          qrCode: 'SL-VEH-A12BC3D-3021',
+          historialOsAnterior: 'OS-2026-00089',
+          historialDias: 18,
+          historialArea: 'Reparaciones mayores',
+        },
+        {
+          placa: 'A99ZZ11',
+          companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
+          marca: 'Mack Granite',
+          anio: 2018,
+          tipo: 'Chuto Pesado 30t',
+          empresa: 'Transporte Andina C.A.',
+          cc: '3022',
+          km: 310450,
+          qrCode: 'SL-VEH-A99ZZ11-3022',
+        },
+        {
+          placa: 'A44TR88',
+          companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
+          marca: 'Ford Cargo 1721',
+          anio: 2020,
+          tipo: 'Camión Plataforma',
+          empresa: 'Transporte Andina C.A.',
+          cc: '3023',
+          km: 215600,
+          qrCode: 'SL-VEH-A44TR88-3023',
+        },
+
+        // Empresa 2: Agro Llanos C.A.
+        {
+          placa: 'B77XY9Z',
+          companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
+          marca: 'Toyota Hilux 4x4',
+          anio: 2021,
+          tipo: 'Pick-up Campo',
+          empresa: 'Agro Llanos C.A.',
+          cc: '1140',
+          km: 96540,
+          qrCode: 'SL-VEH-B77XY9Z-1140',
+          historialOsAnterior: 'OS-2026-00045',
+          historialDias: 40,
+          historialArea: 'Mantenimiento Preventivo',
+        },
+        {
+          placa: 'B22AG55',
+          companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
+          marca: 'John Deere 6125J',
+          anio: 2022,
+          tipo: 'Tractor Agrícola',
+          empresa: 'Agro Llanos C.A.',
+          cc: '1141',
+          km: 4520,
+          qrCode: 'SL-VEH-B22AG55-1141',
+        },
+        {
+          placa: 'B88CC12',
+          companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
+          marca: 'Chevrolet D-Max',
+          anio: 2020,
+          tipo: 'Pick-up Supervisión',
+          empresa: 'Agro Llanos C.A.',
+          cc: '1142',
+          km: 142100,
+          qrCode: 'SL-VEH-B88CC12-1142',
+        },
+
+        // Empresa 3: Distribuidora Centro C.A.
+        {
+          placa: 'C45MN8P',
+          companyId: comp3 ? comp3.id : '33333333-3333-3333-3333-333333333333',
+          marca: 'Mack Granite',
+          anio: 2016,
+          tipo: 'Chuto Logístico',
+          empresa: 'Distribuidora Centro C.A.',
+          cc: '5502',
+          km: 412780,
+          qrCode: 'SL-VEH-C45MN8P-5502',
+        },
+        {
+          placa: 'C90DC33',
+          companyId: comp3 ? comp3.id : '33333333-3333-3333-3333-333333333333',
+          marca: 'Iveco Daily 70C16',
+          anio: 2019,
+          tipo: 'Furgón Distribución Urbana',
+          empresa: 'Distribuidora Centro C.A.',
+          cc: '5503',
+          km: 189000,
+          qrCode: 'SL-VEH-C90DC33-5503',
+        },
+        {
+          placa: 'C12LK77',
+          companyId: comp3 ? comp3.id : '33333333-3333-3333-3333-333333333333',
+          marca: 'Isuzu Forward',
+          anio: 2021,
+          tipo: 'Camión Cava Refrigerada',
+          empresa: 'Distribuidora Centro C.A.',
+          cc: '5504',
+          km: 275300,
+          qrCode: 'SL-VEH-C12LK77-5504',
+        },
+      ]);
+      logger.info('[Seed] Maestro de Flota Vehicular poblado exitosamente para todas las empresas.');
+    }
+
+    // 4. Semilla de Catálogo de Repuestos
+    const repuestoCount = await CatalogoRepuesto.count();
+    if (repuestoCount === 0) {
+      await CatalogoRepuesto.bulkCreate([
+        { cod: 'FRE-0234', desc: 'Disco de freno delantero', stock: 6, costo: 82.00, almacen: 'TLL-01', categoria: 'Frenos' },
+        { cod: 'ROD-0087', desc: 'Rodamiento de maza delantera', stock: 0, costo: 164.00, almacen: 'TLL-01', categoria: 'Tren Delantero' },
+        { cod: 'FIL-0112', desc: 'Filtro de aceite', stock: 2, costo: 12.40, almacen: 'TLL-01', categoria: 'Filtros' },
+        { cod: 'PAS-0301', desc: 'Juego de pastillas de freno', stock: 11, costo: 48.90, almacen: 'TLL-01', categoria: 'Frenos' },
+        { cod: 'COR-0455', desc: 'Kit de correa de distribución', stock: 1, costo: 1290.00, almacen: 'TLL-01', categoria: 'Motor' },
+        { cod: 'ACE-0010', desc: 'Aceite motor 15W40 (litro)', stock: 80, costo: 6.20, almacen: 'TLL-01', categoria: 'Lubricantes' },
+        { cod: 'FIL-0889', desc: 'Filtro de combustible Diesel R90P', stock: 15, costo: 24.50, almacen: 'TLL-01', categoria: 'Filtros' },
+        { cod: 'HID-0105', desc: 'Aceite hidráulico ISO 68 (galón)', stock: 20, costo: 18.30, almacen: 'TLL-01', categoria: 'Lubricantes' },
+      ]);
+      logger.info('[Seed] Catálogo de Repuestos poblado exitosamente.');
+    }
+
+    // 5. Semilla de Órdenes de Servicio por Empresa
+    const ordenCount = await OrdenServicio.count();
+    if (ordenCount === 0) {
+      // Orden 1: Transporte Andina C.A.
+      const demoOrder1 = await OrdenServicio.create({
+        id: 'OS-2026-00101',
+        tenantId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
+        placa: 'A12BC3D',
+        km: 184320,
+        recibidoPor: 'Ing. Carlos Mendoza',
+        entregadoPor: 'Luis Márquez (Operador)',
+        sintomas: 'Ruido metálico al frenar y vibración en el volante sobre 60 km/h.',
+        fotosCount: 1,
+        esReincidencia: true,
+        osAnterior: 'OS-2026-00089',
+        motivoReincidencia: 'Falla distinta, misma área',
+        estado: 'En Proceso',
+        fechaApertura: new Date(),
+        totalRepuestos: 82.00,
+        totalManoObra: 36.00,
+        totalExternos: 0.00,
+        totalGeneral: 118.00,
+      });
+
+      const demoArea1 = await OrdenArea.create({
+        id: 'OT-A1',
+        ordenId: demoOrder1.id,
+        area: 'Reparaciones mayores',
+        fechaRecepcion: new Date(),
+        mecanico: 'José Ramírez',
+        diagnostico: 'Desgaste severo en discos delanteros y holgura en terminales.',
+        horas: 2,
+        tarifaHora: 18,
+        costoManoObra: 36.00,
+        estado: 'abierta',
+      });
+
+      await SolicitudRepuesto.create({
+        ordenId: demoOrder1.id,
+        otId: demoArea1.id,
+        cod: 'FRE-0234',
+        desc: 'Disco de freno delantero',
+        cant: 1,
+        costoUnitario: 82.00,
+        costoTotal: 82.00,
+        stockActual: 6,
+        motivo: 'Reemplazo preventivo por alabeo excesivo.',
+        estadoAprobacion: 'Pendiente',
+        estadoEntrega: 'Por entregar',
+        almacen: 'TLL-01',
+        requiereEscalamiento: false,
+      });
+
+      // Orden 2: Agro Llanos C.A.
+      const demoOrder2 = await OrdenServicio.create({
+        id: 'OS-2026-00201',
+        tenantId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
+        placa: 'B77XY9Z',
+        km: 96540,
+        recibidoPor: 'Ing. Carlos Mendoza',
+        entregadoPor: 'Marcos Rivas (Operador Agro)',
+        sintomas: 'Mantenimiento preventivo 100,000 km y sustitución de filtros de combustible y aceite.',
+        fotosCount: 0,
+        esReincidencia: false,
+        estado: 'Abierta',
+        fechaApertura: new Date(),
+        totalRepuestos: 36.90,
+        totalManoObra: 25.00,
+        totalExternos: 0.00,
+        totalGeneral: 61.90,
+      });
+
+      const demoArea2 = await OrdenArea.create({
+        id: 'OT-B1',
+        ordenId: demoOrder2.id,
+        area: 'Mantenimiento Preventivo',
+        fechaRecepcion: new Date(),
+        mecanico: 'José Ramírez',
+        diagnostico: 'Revisión periódica de fluidos, correas y filtros.',
+        horas: 1.5,
+        tarifaHora: 18,
+        costoManoObra: 27.00,
+        estado: 'abierta',
+      });
+
+      await SolicitudRepuesto.create({
+        ordenId: demoOrder2.id,
+        otId: demoArea2.id,
+        cod: 'FIL-0112',
+        desc: 'Filtro de aceite',
+        cant: 1,
+        costoUnitario: 12.40,
+        costoTotal: 12.40,
+        stockActual: 2,
+        motivo: 'Mantenimiento preventivo periódico.',
+        estadoAprobacion: 'Aprobada',
+        estadoEntrega: 'Por entregar',
+        almacen: 'TLL-01',
+        requiereEscalamiento: false,
+      });
+
+      // Orden 3: Distribuidora Centro C.A.
+      const demoOrder3 = await OrdenServicio.create({
+        id: 'OS-2026-00301',
+        tenantId: comp3 ? comp3.id : '33333333-3333-3333-3333-333333333333',
+        placa: 'C45MN8P',
+        km: 412780,
+        recibidoPor: 'Ing. Carlos Mendoza',
+        entregadoPor: 'Ramón Velásquez (Conductor)',
+        sintomas: 'Fuga de aire en sistema neumático y pérdida de potencia en pendiente.',
+        fotosCount: 2,
+        esReincidencia: false,
+        estado: 'En Proceso',
+        fechaApertura: new Date(),
+        totalRepuestos: 48.90,
+        totalManoObra: 54.00,
+        totalExternos: 45.00,
+        totalGeneral: 147.90,
+      });
+
+      const demoArea3 = await OrdenArea.create({
+        id: 'OT-C1',
+        ordenId: demoOrder3.id,
+        area: 'Sistema Neumático y Frenos',
+        fechaRecepcion: new Date(),
+        mecanico: 'José Ramírez',
+        diagnostico: 'Válvula de cuatro vías con fuga y mangueras desgastadas.',
+        horas: 3,
+        tarifaHora: 18,
+        costoManoObra: 54.00,
+        estado: 'abierta',
+      });
+
+      await SolicitudRepuesto.create({
+        ordenId: demoOrder3.id,
+        otId: demoArea3.id,
+        cod: 'PAS-0301',
+        desc: 'Juego de pastillas de freno',
+        cant: 1,
+        costoUnitario: 48.90,
+        costoTotal: 48.90,
+        stockActual: 11,
+        motivo: 'Desgaste por kilometraje elevado.',
+        estadoAprobacion: 'Pendiente',
+        estadoEntrega: 'Por entregar',
+        almacen: 'TLL-01',
+        requiereEscalamiento: false,
+      });
+
+      await SolicitudExterno.create({
+        ordenId: demoOrder3.id,
+        otId: demoArea3.id,
+        proveedor: 'Rectificadora y Neumática Industrial C.A.',
+        descripcion: 'Calibración y prueba de banco de válvula neumática',
+        conGarantia: false,
+        costoCotizado: 45.00,
+        costoEfectivo: 45.00,
+        estadoAprobacion: 'Pendiente',
+      });
+
+      logger.info('[Seed] Órdenes de Servicio inicializadas para todas las empresas.');
+    }
+
+    // 8. Semilla de Conexión de Base de Datos MSSQL Profit Plus (AD_TRANS)
+    const connCount = await DatabaseConnection.count();
+    if (connCount === 0) {
+      await DatabaseConnection.create({
+        id: '99999999-9999-9999-9999-999999999999',
+        nombre: 'Servidor Profit Plus Producción (AD_TRANS)',
+        host: process.env.PROFIT_DB_HOST || 'SRVBDPROFITBK',
+        port: parseInt(process.env.PROFIT_DB_PORT || '1433', 10),
+        databaseName: process.env.PROFIT_DB_NAME || 'AD_TRANS',
+        username: process.env.PROFIT_DB_USER || 'solicitudweb',
+        password: process.env.PROFIT_DB_PASSWORD || 'solicitudweb',
+        dialect: (process.env.PROFIT_DB_DIALECT || 'mssql').toLowerCase(),
+        trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE !== 'false',
+        encrypt: false,
+        isDefault: true,
+        isActive: true,
+        status: 'CONNECTED',
+        lastTestedAt: new Date(),
+        options: {
+          connectTimeout: 5000,
+          requestTimeout: 15000,
+          pool: { max: 10, min: 0 },
+        },
+      });
+      logger.info('[Seed] Conexión predeterminada MSSQL Profit Plus (AD_TRANS) registrada en SQLite.');
+    }
+
+    // 9. Semilla de Matriz de Permisos por Rol (RBAC)
+    const permCount = await RolePermission.count();
+    if (permCount === 0) {
+      const defaultRolePerms = [
+        // ADMIN (Acceso Total)
+        { role: 'ADMIN', module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'admin'], description: 'Control total de órdenes de taller' },
+        { role: 'ADMIN', module: 'fleet', actions: ['read', 'create', 'update', 'delete', 'admin'], description: 'Control total del maestro de flota' },
+        { role: 'ADMIN', module: 'almacen', actions: ['read', 'create', 'update', 'delete', 'dispatch', 'admin'], description: 'Control total de almacén e inventario' },
+        { role: 'ADMIN', module: 'aprobaciones', actions: ['read', 'approve', 'reject', 'admin'], description: 'Aprobación y autorización de órdenes y gastos' },
+        { role: 'ADMIN', module: 'users', actions: ['read', 'create', 'update', 'delete', 'admin'], description: 'Gestión global de usuarios y membresías' },
+        { role: 'ADMIN', module: 'permissions', actions: ['read', 'update', 'admin'], description: 'Administración de la matriz de roles y permisos' },
+        { role: 'ADMIN', module: 'db_connections', actions: ['read', 'create', 'update', 'delete', 'test', 'admin'], description: 'Gestión y prueba de conexiones de bases de datos MSSQL/SQLite' },
+        { role: 'ADMIN', module: 'query_runner', actions: ['read', 'execute_query', 'admin'], description: 'Ejecución de consultas SQL directas a Profit Plus MSSQL' },
+        { role: 'ADMIN', module: 'reports', actions: ['read', 'export', 'admin'], description: 'Auditoría y reportes financieros consolidados' },
+
+        // GERENTE_TALLER
+        { role: 'GERENTE_TALLER', module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve'], description: 'Gestión operativa de taller' },
+        { role: 'GERENTE_TALLER', module: 'fleet', actions: ['read', 'create', 'update'], description: 'Consulta y actualización de flota' },
+        { role: 'GERENTE_TALLER', module: 'almacen', actions: ['read', 'create'], description: 'Consulta de repuestos y solicitudes' },
+        { role: 'GERENTE_TALLER', module: 'aprobaciones', actions: ['read', 'approve', 'reject'], description: 'Aprobación de repuestos y servicios externos' },
+        { role: 'GERENTE_TALLER', module: 'reports', actions: ['read', 'export'], description: 'Reportes de taller' },
+
+        // SUPERVISOR
+        { role: 'SUPERVISOR', module: 'taller', actions: ['read', 'create', 'update', 'approve'], description: 'Supervisión y aprobación de órdenes' },
+        { role: 'SUPERVISOR', module: 'fleet', actions: ['read', 'update'], description: 'Seguimiento de flota' },
+        { role: 'SUPERVISOR', module: 'almacen', actions: ['read', 'create'], description: 'Solicitud de insumos' },
+        { role: 'SUPERVISOR', module: 'aprobaciones', actions: ['read', 'approve'], description: 'Validación de diagnósticos' },
+
+        // RESPONSABLE_FLOTA
+        { role: 'RESPONSABLE_FLOTA', module: 'fleet', actions: ['read', 'create', 'update'], description: 'Administración de flota y kilometrajes' },
+        { role: 'RESPONSABLE_FLOTA', module: 'taller', actions: ['read', 'create'], description: 'Apertura de órdenes y reporte de síntomas' },
+        { role: 'RESPONSABLE_FLOTA', module: 'reports', actions: ['read'], description: 'Informes de disponibilidad' },
+
+        // MECANICO
+        { role: 'MECANICO', module: 'taller', actions: ['read', 'update'], description: 'Diagnóstico y registro de mano de obra en áreas' },
+        { role: 'MECANICO', module: 'almacen', actions: ['read', 'create'], description: 'Solicitud de repuestos necesarios' },
+        { role: 'MECANICO', module: 'fleet', actions: ['read'], description: 'Consulta de fichas técnicas' },
+
+        // ALMACENISTA
+        { role: 'ALMACENISTA', module: 'almacen', actions: ['read', 'create', 'update', 'dispatch'], description: 'Despacho y entrega de repuestos' },
+        { role: 'ALMACENISTA', module: 'taller', actions: ['read'], description: 'Consulta de órdenes para despacho' },
+        { role: 'ALMACENISTA', module: 'reports', actions: ['read'], description: 'Kárdex e inventario' },
+
+        // SOLICITANTE
+        { role: 'SOLICITANTE', module: 'taller', actions: ['read', 'create'], description: 'Solicitud y apertura de servicios' },
+        { role: 'SOLICITANTE', module: 'fleet', actions: ['read'], description: 'Consulta de vehículos' },
+
+        // AUDITOR
+        { role: 'AUDITOR', module: 'taller', actions: ['read'], description: 'Auditoría de órdenes' },
+        { role: 'AUDITOR', module: 'fleet', actions: ['read'], description: 'Auditoría de flota' },
+        { role: 'AUDITOR', module: 'almacen', actions: ['read'], description: 'Auditoría de inventario' },
+        { role: 'AUDITOR', module: 'aprobaciones', actions: ['read'], description: 'Trazabilidad de aprobaciones' },
+        { role: 'AUDITOR', module: 'reports', actions: ['read', 'export'], description: 'Exportación de reportes de auditoría' },
+
+        // OPERADOR
+        { role: 'OPERADOR', module: 'taller', actions: ['read'], description: 'Visualización de estatus de órdenes' },
+        { role: 'OPERADOR', module: 'fleet', actions: ['read'], description: 'Consulta básica de unidad' },
+      ];
+
+      for (const p of defaultRolePerms) {
+        await RolePermission.create(p);
+      }
+      logger.info(`[Seed] Matriz RBAC inicializada con ${defaultRolePerms.length} reglas de permisos por rol.`);
+    }
+
+    logger.info('[Seed] Inicialización de base de datos completada satisfactoriamente.');
+  } catch (error) {
+    logger.error('[Seed] Error al inicializar datos:', error);
+  }
+};

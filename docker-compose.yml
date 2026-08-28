@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # Servidor Backend Express San Luis
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sanluis_backend_api
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - JWT_SECRET=development-secret-keys-for-sanluis-app-2026
+      - JWT_PREAUTH_SECRET=development-preauth-secret-keys-for-sanluis-app-2026
+      - DB_DIALECT=mssql
+      - DB_HOST=mssql_db
+      - DB_PORT=1433
+      - DB_NAME=sanluis_db
+      - DB_USER=sa
+      - DB_PASSWORD=SanLuisPassword2026!
+      - UPLOAD_DIR=/app/data/uploads
+      - STORAGE_DRIVER=local
+      - CORS_ORIGIN=*
+      - SESSION_TTL=8h
+      - PREAUTH_TTL=15m
+    volumes:
+      - sanluis_uploads:/app/data/uploads
+    depends_on:
+      mssql_db:
+        condition: service_healthy
+    networks:
+      - sanluis_network
+
+  # Base de Datos Microsoft SQL Server 2022
+  mssql_db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sanluis_mssql
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=SanLuisPassword2026!
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'SanLuisPassword2026!' -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - sanluis_network
+
+volumes:
+  sanluis_uploads:
+    driver: local
+  mssql_data:
+    driver: local
+
+networks:
+  sanluis_network:
+    driver: bridge

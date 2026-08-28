@@ -1,0 +1,104 @@
+name: San Luis Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # 1. Calidad de Código y Validación de Tipos
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Código Fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Verificación de Tipos TypeScript
+        run: npm run lint
+
+  # 2. Pruebas Unitarias e Integración
+  test:
+    name: Pruebas Unitarias y de Seguridad
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Ejecutar Suite de Pruebas Unitarias
+        run: npm run test
+        env:
+          NODE_ENV: test
+          DB_DIALECT: sqlite
+          JWT_SECRET: ci-cd-test-secret-key-2026
+
+  # 3. Compilación y Construcción de Artefactos
+  build:
+    name: Build & Bundle
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Compilar Frontend & Backend Bundle
+        run: npm run build
+
+      - name: Validar Existencia de Artefactos de Distribución
+        run: |
+          test -f dist/server.cjs || exit 1
+          test -f dist/index.html || exit 1
+
+  # 4. Construcción y Publicación de Contenedor Docker
+  docker-build:
+    name: Docker Build & Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: actions/setup-buildx-action@v3
+
+      - name: Construir Imagen Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: sanluis-backend-api:latest
