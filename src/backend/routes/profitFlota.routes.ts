@@ -7,6 +7,7 @@ import {
   queryProfitOrdenSchema,
   queryVendedoresSchema,
   queryArticulosSchema,
+  queryMecanicosSchema,
 } from '../validations/profitFlota.validation';
 
 const router = Router();
@@ -32,6 +33,13 @@ router.get('/vendedores', validateJoi(queryVendedoresSchema), ProfitFlotaControl
  * FROM [AD_TRANS].[dbo].[vw_flota_articulos]
  */
 router.get('/articulos', validateJoi(queryArticulosSchema), ProfitFlotaController.getArticulos);
+
+/**
+ * @route GET /api/v1/profit/mecanicos
+ * @desc Listado con filtros y paginado de mecánicos desde ad_trans.dbo.mecanicos
+ * SELECT [codigo], [nombre], [cargo], [activo] FROM [ad_trans].[dbo].[mecanicos]
+ */
+router.get('/mecanicos', validateJoi(queryMecanicosSchema), ProfitFlotaController.getMecanicos);
 
 /**
  * @route GET /api/v1/profit/flota-ordenes/stats

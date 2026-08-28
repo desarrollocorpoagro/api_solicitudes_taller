@@ -128,6 +128,11 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
 
   const PRESET_QUERIES = [
     {
+      title: 'Mecánicos de Taller (ad_trans.dbo.mecanicos)',
+      desc: 'Consulta personal técnico, códigos, especialidades/cargos y estatus activo',
+      sql: 'SELECT [codigo]\n      ,[nombre]\n      ,[cargo]\n      ,[activo]\n  FROM [ad_trans].[dbo].[mecanicos]',
+    },
+    {
       title: 'Artículos & Stock Profit Plus (vw_flota_articulos)',
       desc: 'Consulta todos los repuestos, costos y stock actual por almacén',
       sql: 'SELECT [codigo_profit]\n      ,[nombre_producto]\n      ,[codigo_categoria]\n      ,[categoria]\n      ,[unidad_medida]\n      ,[costo]\n      ,[tipo]\n      ,[codigo_subalmacen]\n      ,[sub_almacen]\n      ,[codigo_almacen]\n      ,[almacen]\n      ,[stock_act]\n  FROM [AD_TRANS].[dbo].[vw_flota_articulos]',

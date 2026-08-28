@@ -688,6 +688,63 @@ Documentación oficial de los endpoints de la API del Grupo San Luis desarrollad
         },
       },
     },
+    '/profit/mecanicos': {
+      get: {
+        tags: ['Profit Plus MSSQL (AD_TRANS)'],
+        summary: 'Listado con múltiples filtros y paginado de mecánicos y personal de taller desde ad_trans.dbo.mecanicos',
+        description: 'Ejecuta la consulta: SELECT [codigo], [nombre], [cargo], [activo] FROM [ad_trans].[dbo].[mecanicos] con soporte de filtros por código, nombre, cargo, estado activo, búsqueda global, ordenamiento y paginación.',
+        parameters: [
+          { name: 'page', in: 'query', description: 'Número de página (predeterminado 1)', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', description: 'Cantidad de registros por página (predeterminado 20, máx 100)', schema: { type: 'integer', default: 20 } },
+          { name: 'search', in: 'query', description: 'Búsqueda global por código, nombre o cargo', schema: { type: 'string' } },
+          { name: 'codigo', in: 'query', description: 'Filtrar por código de mecánico (ej. MEC-001)', schema: { type: 'string' } },
+          { name: 'nombre', in: 'query', description: 'Filtrar por nombre del mecánico', schema: { type: 'string' } },
+          { name: 'cargo', in: 'query', description: 'Filtrar por cargo o especialidad técnica', schema: { type: 'string' } },
+          { name: 'activo', in: 'query', description: 'Filtrar por mecánicos activos (true/false, 1/0)', schema: { type: 'boolean' } },
+          { name: 'sortBy', in: 'query', description: 'Campo de ordenamiento', schema: { type: 'string', enum: ['codigo', 'nombre', 'cargo', 'activo'], default: 'nombre' } },
+          { name: 'sortOrder', in: 'query', description: 'Sentido del orden', schema: { type: 'string', enum: ['ASC', 'DESC'], default: 'ASC' } },
+        ],
+        responses: {
+          200: {
+            description: 'Listado paginado de mecánicos retornado exitosamente',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    source: { type: 'string', example: '[ad_trans].[dbo].[mecanicos]' },
+                    querySql: { type: 'string', example: 'SELECT [codigo], [nombre], [cargo], [activo] FROM [ad_trans].[dbo].[mecanicos]' },
+                    data: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          codigo: { type: 'string', example: 'MEC-001' },
+                          nombre: { type: 'string', example: 'José Gregorio Hernández Ramírez' },
+                          cargo: { type: 'string', example: 'Mecánico Diésel Master / Especialista Motor' },
+                          activo: { type: 'boolean', example: true },
+                        },
+                      },
+                    },
+                    pagination: {
+                      type: 'object',
+                      properties: {
+                        total: { type: 'integer', example: 7 },
+                        page: { type: 'integer', example: 1 },
+                        limit: { type: 'integer', example: 20 },
+                        totalPages: { type: 'integer', example: 1 },
+                        hasMore: { type: 'boolean', example: false },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     '/profit/flota-ordenes/stats': {
       get: {
         tags: ['Profit Plus MSSQL (AD_TRANS)'],

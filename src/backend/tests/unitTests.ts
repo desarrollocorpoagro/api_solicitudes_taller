@@ -319,6 +319,41 @@ export async function runAllUnitTests(): Promise<{ total: number; passed: number
     }
   });
 
+  await runTest('Profit Plus [AD_TRANS]', 'Debe consultar y filtrar tabla ad_trans.dbo.mecanicos (SELECT codigo,nombre,cargo,activo)', async () => {
+    const { ProfitFlotaController } = await import('../controllers/profitFlota.controller');
+
+    const req: any = {
+      query: {
+        page: '1',
+        limit: '10',
+        activo: 'true',
+        sortBy: 'nombre',
+        sortOrder: 'ASC',
+      },
+    };
+    let responseData: any = null;
+    const res: any = {
+      status: () => res,
+      json: (data: any) => {
+        responseData = data;
+        return res;
+      },
+    };
+
+    await ProfitFlotaController.getMecanicos(req, res);
+
+    if (!responseData?.success || !Array.isArray(responseData?.data)) {
+      throw new Error('Endpoint getMecanicos no retornó una respuesta válida');
+    }
+    if (responseData.data.length === 0) {
+      throw new Error('No se encontraron mecánicos en ad_trans.dbo.mecanicos');
+    }
+    const first = responseData.data[0];
+    if (!first.codigo || !first.nombre || first.activo === undefined) {
+      throw new Error('El registro de mecánico no contiene codigo, nombre o activo');
+    }
+  });
+
   const passed = results.filter((r) => r.passed).length;
   const failed = results.filter((r) => !r.passed).length;
 

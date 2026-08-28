@@ -3,6 +3,7 @@ import { Op, fn, col } from 'sequelize';
 import FlotaOrdenServicioProfit from '../models/FlotaOrdenServicioProfit.model';
 import VwFlotaVendedores from '../models/VwFlotaVendedores.model';
 import VwFlotaArticulos from '../models/VwFlotaArticulos.model';
+import MecanicosProfit from '../models/MecanicosProfit.model';
 import { getProfitConnectionStatus, profitSequelize } from '../config/profitDb';
 import { logger } from '../utils/logger';
 
@@ -646,6 +647,92 @@ export class ProfitFlotaController {
       return res.status(500).json({
         success: false,
         error: 'Error al consultar la vista de artículos en AD_TRANS (vw_flota_articulos)',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * @route GET /api/v1/profit/mecanicos
+   * @desc Obtiene la lista de mecánicos y personal de taller desde [ad_trans].[dbo].[mecanicos]
+   * SELECT [codigo], [nombre], [cargo], [activo] FROM [ad_trans].[dbo].[mecanicos]
+   */
+  public static async getMecanicos(req: Request, res: Response): Promise<Response> {
+    try {
+      const page = parseInt(req.query.page as string, 10) || 1;
+      const limit = parseInt(req.query.limit as string, 10) || 20;
+      const offset = (page - 1) * limit;
+
+      const { search, q, codigo, nombre, cargo, activo, sortBy = 'nombre', sortOrder = 'ASC' } = req.query;
+
+      const whereClause: any = {};
+
+      if (codigo) {
+        whereClause.codigo = { [Op.like]: `%${String(codigo).trim()}%` };
+      }
+
+      if (nombre) {
+        whereClause.nombre = { [Op.like]: `%${String(nombre).trim()}%` };
+      }
+
+      if (cargo) {
+        whereClause.cargo = { [Op.like]: `%${String(cargo).trim()}%` };
+      }
+
+      if (activo !== undefined && activo !== '') {
+        const isActivo = String(activo).toLowerCase() === 'true' || String(activo) === '1';
+        whereClause.activo = isActivo;
+      }
+
+      const globalSearch = search || q;
+      if (globalSearch) {
+        const searchTerm = `%${String(globalSearch).trim()}%`;
+        whereClause[Op.or] = [
+          { codigo: { [Op.like]: searchTerm } },
+          { nombre: { [Op.like]: searchTerm } },
+          { cargo: { [Op.like]: searchTerm } },
+        ];
+      }
+
+      const allowedSort = ['codigo', 'nombre', 'cargo', 'activo'];
+      const finalSortBy = allowedSort.includes(String(sortBy)) ? String(sortBy) : 'nombre';
+      const finalSortOrder = String(sortOrder).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+      const { count, rows } = await MecanicosProfit.findAndCountAll({
+        attributes: ['codigo', 'nombre', 'cargo', 'activo'],
+        where: whereClause,
+        limit,
+        offset,
+        order: [[finalSortBy, finalSortOrder]],
+      });
+
+      return res.json({
+        success: true,
+        source: '[ad_trans].[dbo].[mecanicos]',
+        querySql: 'SELECT [codigo], [nombre], [cargo], [activo] FROM [ad_trans].[dbo].[mecanicos]',
+        data: rows,
+        pagination: {
+          total: count,
+          page,
+          limit,
+          totalPages: Math.ceil(count / limit),
+          hasMore: page * limit < count,
+        },
+        filtrosAplicados: {
+          search: globalSearch || null,
+          codigo: codigo || null,
+          nombre: nombre || null,
+          cargo: cargo || null,
+          activo: activo !== undefined && activo !== '' ? activo : null,
+          sortBy: finalSortBy,
+          sortOrder: finalSortOrder,
+        },
+      });
+    } catch (error: any) {
+      logger.error(`[ProfitFlotaController] Error consultando mecanicos: ${error.message}`);
+      return res.status(500).json({
+        success: false,
+        error: 'Error al consultar la tabla de mecánicos en AD_TRANS (ad_trans.dbo.mecanicos)',
         details: error.message,
       });
     }

@@ -132,9 +132,11 @@ export async function initProfitDatabase(): Promise<Sequelize> {
       const { initFlotaOrdenServicioProfitModel } = await import('../models/FlotaOrdenServicioProfit.model');
       const { initVwFlotaVendedoresModel } = await import('../models/VwFlotaVendedores.model');
       const { initVwFlotaArticulosModel } = await import('../models/VwFlotaArticulos.model');
+      const { initMecanicosProfitModel } = await import('../models/MecanicosProfit.model');
       initFlotaOrdenServicioProfitModel(profitSequelize);
       initVwFlotaVendedoresModel(profitSequelize);
       initVwFlotaArticulosModel(profitSequelize);
+      initMecanicosProfitModel(profitSequelize);
 
       logger.info(`[Profit MSSQL] Respaldo local SQLite para AD_TRANS inicializado exitosamente.`);
       return profitSequelize;
@@ -201,6 +203,15 @@ async function seedProfitFallbackTables(seq: Sequelize): Promise<void> {
       );
     `);
 
+    await seq.query(`
+      CREATE TABLE IF NOT EXISTS mecanicos (
+        codigo TEXT PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        cargo TEXT,
+        activo INTEGER DEFAULT 1
+      );
+    `);
+
     // Sembrar Vendedores si está vacía
     const [vendedores]: any = await seq.query(`SELECT COUNT(*) as count FROM vw_flota_vendedores`);
     if (vendedores[0]?.count === 0) {
@@ -237,6 +248,22 @@ async function seedProfitFallbackTables(seq: Sequelize): Promise<void> {
         ('RET-CIG', 'Retén de cigüeñal trasero vitón alta temp', 'MOT', 'Motor y Transmisión', 'UND', 22.80, 'Repuesto', 'SUB-MOT', 'Repuestos de Motor', 'ALM-01', 'Almacén Central', 7);
       `);
       logger.info(`[Profit SQLite Fallback] Artículos de prueba sembrados en vw_flota_articulos`);
+    }
+
+    // Sembrar Mecánicos si está vacía
+    const [mecanicos]: any = await seq.query(`SELECT COUNT(*) as count FROM mecanicos`);
+    if (mecanicos[0]?.count === 0) {
+      await seq.query(`
+        INSERT INTO mecanicos (codigo, nombre, cargo, activo) VALUES
+        ('MEC-001', 'José Gregorio Hernández Ramírez', 'Mecánico Diésel Master / Especialista Motor', 1),
+        ('MEC-002', 'Marcos Antonio Peña Albarrán', 'Técnico Especialista en Frenos y Neumática', 1),
+        ('MEC-003', 'Luis Eduardo Quintero Mendoza', 'Electricista Automotriz y Diagnóstico Electrónico', 1),
+        ('MEC-004', 'Alexander José Colmenares Gil', 'Técnico de Suspensión, Dirección y Tren Delantero', 1),
+        ('MEC-005', 'Franklin Daniel Morales Soto', 'Mecánico Ajustador de Transmisión y Cajas', 1),
+        ('MEC-006', 'Víctor Hugo Velazco Parra', 'Ayudante de Taller y Mantenimiento Rápido', 1),
+        ('MEC-007', 'Roberto Carlos Díaz Blanco', 'Tornero / Mecánico de Reconstrucción', 0);
+      `);
+      logger.info(`[Profit SQLite Fallback] Mecánicos de prueba sembrados en ad_trans.dbo.mecanicos`);
     }
   } catch (err: any) {
     logger.warn(`[Profit SQLite Fallback] Error sembrando tablas de respaldo: ${err.message}`);

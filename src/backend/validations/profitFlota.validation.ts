@@ -125,3 +125,19 @@ export const queryArticulosSchema = {
   }),
 };
 
+export const queryMecanicosSchema = {
+  query: Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(20),
+    search: Joi.string().allow('', null).optional(),
+    q: Joi.string().allow('', null).optional(),
+    codigo: Joi.string().allow('', null).optional(),
+    nombre: Joi.string().allow('', null).optional(),
+    cargo: Joi.string().allow('', null).optional(),
+    activo: Joi.alternatives().try(Joi.boolean(), Joi.string().valid('true', 'false', '1', '0')).optional(),
+    sortBy: Joi.string().valid('codigo', 'nombre', 'cargo', 'activo').default('nombre'),
+    sortOrder: Joi.string().valid('ASC', 'DESC', 'asc', 'desc').default('ASC'),
+  }),
+};
+
+

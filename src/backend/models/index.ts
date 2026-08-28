@@ -13,6 +13,7 @@ import Multimedia from './Multimedia.model';
 import FlotaOrdenServicioProfit from './FlotaOrdenServicioProfit.model';
 import VwFlotaVendedores from './VwFlotaVendedores.model';
 import VwFlotaArticulos from './VwFlotaArticulos.model';
+import MecanicosProfit from './MecanicosProfit.model';
 import DatabaseConnection from './DatabaseConnection.model';
 import RolePermission from './RolePermission.model';
 import UserPermission from './UserPermission.model';
@@ -60,6 +61,7 @@ export {
   FlotaOrdenServicioProfit,
   VwFlotaVendedores,
   VwFlotaArticulos,
+  MecanicosProfit,
   DatabaseConnection,
   RolePermission,
   UserPermission,
