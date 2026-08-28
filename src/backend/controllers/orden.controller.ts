@@ -8,6 +8,7 @@ import {
   FlotaVehicular,
   Multimedia,
   Company,
+  FlotaOrdenServicioProfit,
 } from '../models';
 import { EmailService } from '../services/email.service';
 import { logger } from '../utils/logger';
@@ -185,6 +186,37 @@ export class OrdenController {
         totalGeneral: 0,
       });
 
+      // Guardar y sincronizar simultáneamente en MSSQL Profit Plus (ad_trans.dbo.flota_ordenes_servicio)
+      let syncedToMssql = false;
+      try {
+        await FlotaOrdenServicioProfit.create({
+          nro_orden: String(nuevaOrden.id).trim().toUpperCase(),
+          Placa: String(nuevaOrden.placa).trim().toUpperCase(),
+          km_horometro: parseFloat(String(nuevaOrden.km)) || 0,
+          recibido_por: String(nuevaOrden.recibidoPor).trim(),
+          entregado_por: nuevaOrden.entregadoPor ? String(nuevaOrden.entregadoPor).trim() : null,
+          fec_apertura: nuevaOrden.fechaApertura || new Date(),
+          fec_cierre: null,
+          sintomas_reportados: String(nuevaOrden.sintomas).trim(),
+          es_reincidencia: Boolean(nuevaOrden.esReincidencia),
+          nro_orden_anterior: nuevaOrden.osAnterior ? String(nuevaOrden.osAnterior).trim() : null,
+          motivo_reincidencia: nuevaOrden.motivoReincidencia ? String(nuevaOrden.motivoReincidencia).trim() : null,
+          fotos_adjuntas: 0,
+          estatus: 'ABIERTA',
+          costo_repuestos: 0.0,
+          costo_mano_obra: 0.0,
+          costo_servicios_ext: 0.0,
+          costo_total: 0.0,
+          recibe_conforme: null,
+          hora_apertura: new Date(),
+          hora_cierre: null,
+        });
+        syncedToMssql = true;
+        logger.info(`[OrdenController] Orden ${nuevaOrden.id} guardada exitosamente en BD Local y en MSSQL (ad_trans.dbo.flota_ordenes_servicio)`);
+      } catch (mssqlErr: any) {
+        logger.warn(`[OrdenController] Advertencia al sincronizar orden ${nuevaOrden.id} en MSSQL Profit Plus: ${mssqlErr.message}`);
+      }
+
       // Disparar notificación por correo
       EmailService.notifyOrdenApertura(
         nuevaOrden.id,
@@ -201,6 +233,7 @@ export class OrdenController {
         message: 'Orden de servicio aperturada exitosamente.',
         data: nuevaOrden,
         unidad,
+        syncedToMssql,
       });
     } catch (error: any) {
       logger.error(`[OrdenController] Error al aperturar orden: ${error.message}`);
@@ -366,6 +399,25 @@ export class OrdenController {
       orden.totalGeneral = totales.totalGeneral;
 
       await orden.save();
+
+      // Sincronizar cierre en MSSQL Profit Plus (ad_trans.dbo.flota_ordenes_servicio)
+      try {
+        const profitOrden = await FlotaOrdenServicioProfit.findOne({ where: { nro_orden: orden.id } });
+        if (profitOrden) {
+          profitOrden.estatus = 'CERRADA';
+          profitOrden.fec_cierre = orden.fechaEntrega || new Date();
+          profitOrden.recibe_conforme = recibeConforme ? String(recibeConforme).trim() : null;
+          profitOrden.costo_repuestos = totales.totalRepuestos;
+          profitOrden.costo_mano_obra = totales.totalManoObra;
+          profitOrden.costo_servicios_ext = totales.totalExternos;
+          profitOrden.costo_total = totales.totalGeneral;
+          profitOrden.hora_cierre = new Date();
+          await profitOrden.save();
+          logger.info(`[OrdenController] Cierre de orden ${orden.id} sincronizado en MSSQL AD_TRANS`);
+        }
+      } catch (mssqlCloseErr: any) {
+        logger.warn(`[OrdenController] No se pudo actualizar cierre en MSSQL: ${mssqlCloseErr.message}`);
+      }
 
       // Si la unidad tuvo reparación mayor, actualizar historial para futuras reincidencias
       if (unidad) {

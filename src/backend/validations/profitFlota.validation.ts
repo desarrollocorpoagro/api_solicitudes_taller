@@ -87,7 +87,7 @@ export const queryProfitOrdenSchema = {
 export const queryVendedoresSchema = {
   query: Joi.object({
     page: Joi.number().integer().min(1).default(1),
-    limit: Joi.number().integer().min(1).max(100).default(20),
+    limit: Joi.number().integer().min(1).max(1000).default(20),
     search: Joi.string().allow('', null).optional(),
     q: Joi.string().allow('', null).optional(),
     co_ven: Joi.string().allow('', null).optional(),
@@ -102,7 +102,7 @@ export const queryVendedoresSchema = {
 export const queryArticulosSchema = {
   query: Joi.object({
     page: Joi.number().integer().min(1).default(1),
-    limit: Joi.number().integer().min(1).max(100).default(20),
+    limit: Joi.number().integer().min(1).max(1000).default(20),
     search: Joi.string().allow('', null).optional(),
     q: Joi.string().allow('', null).optional(),
     codigo_profit: Joi.string().allow('', null).optional(),
@@ -128,7 +128,7 @@ export const queryArticulosSchema = {
 export const queryMecanicosSchema = {
   query: Joi.object({
     page: Joi.number().integer().min(1).default(1),
-    limit: Joi.number().integer().min(1).max(100).default(20),
+    limit: Joi.number().integer().min(1).max(1000).default(20),
     search: Joi.string().allow('', null).optional(),
     q: Joi.string().allow('', null).optional(),
     codigo: Joi.string().allow('', null).optional(),

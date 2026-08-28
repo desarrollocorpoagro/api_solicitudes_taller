@@ -354,6 +354,63 @@ export async function runAllUnitTests(): Promise<{ total: number; passed: number
     }
   });
 
+  await runTest('Persistencia Dual (Local + MSSQL)', 'Al aperturar orden de servicio debe guardarse tanto en BD Local como en MSSQL AD_TRANS (flota_ordenes_servicio)', async () => {
+    const { OrdenController } = await import('../controllers/orden.controller');
+    const { OrdenServicio, FlotaOrdenServicioProfit } = await import('../models');
+
+    const req: any = {
+      body: {
+        placa: 'A12BC3D',
+        km: 195000,
+        recibidoPor: 'MEC-001',
+        entregadoPor: 'Carlos Eduardo Mendoza Silva',
+        sintomas: 'Prueba de persistencia dual Local y MSSQL',
+        esReincidencia: false,
+      },
+      tenantId: '11111111-1111-1111-1111-111111111111',
+      headers: {
+        'x-tenant-id': '11111111-1111-1111-1111-111111111111',
+      },
+    };
+
+    let responseData: any = null;
+    let statusCode = 200;
+    const res: any = {
+      status: (code: number) => {
+        statusCode = code;
+        return res;
+      },
+      json: (data: any) => {
+        responseData = data;
+        return res;
+      },
+    };
+
+    await OrdenController.createOrden(req, res);
+
+    if (statusCode !== 201 || !responseData?.success) {
+      throw new Error(`Error al aperturar orden: ${responseData?.error || 'Respuesta inválida'}`);
+    }
+
+    const createdId = responseData.data.id;
+
+    // Verificar en BD Local
+    const ordenLocal = await OrdenServicio.findByPk(createdId);
+    if (!ordenLocal) {
+      throw new Error(`Orden ${createdId} no fue encontrada en la base de datos local`);
+    }
+
+    // Verificar en MSSQL (FlotaOrdenServicioProfit)
+    const ordenMssql = await FlotaOrdenServicioProfit.findOne({ where: { nro_orden: createdId } });
+    if (!ordenMssql) {
+      throw new Error(`Orden ${createdId} no fue encontrada en la tabla MSSQL (ad_trans.dbo.flota_ordenes_servicio)`);
+    }
+
+    if (ordenMssql.recibido_por !== 'MEC-001') {
+      throw new Error(`El campo recibido_por en MSSQL no almacenó el código 'MEC-001', guardó '${ordenMssql.recibido_por}'`);
+    }
+  });
+
   const passed = results.filter((r) => r.passed).length;
   const failed = results.filter((r) => !r.passed).length;
 

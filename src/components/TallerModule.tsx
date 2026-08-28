@@ -14,8 +14,25 @@ import {
   X,
   Upload,
   RefreshCw,
-  Send
+  Send,
+  User,
+  Users,
+  Search,
+  ChevronDown
 } from 'lucide-react';
+
+interface MecanicoProfitItem {
+  codigo: string;
+  nombre: string;
+  cargo: string | null;
+  activo: boolean;
+}
+
+interface VendedorProfitItem {
+  co_ven: string;
+  cedula: string | null;
+  ven_des: string;
+}
 
 interface Unidad {
   placa: string;
@@ -83,8 +100,8 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
   const [placa, setPlaca] = useState('A12BC3D');
   const [unidad, setUnidad] = useState<Unidad | null>(null);
   const [km, setKm] = useState(184320);
-  const [recibidoPor, setRecibidoPor] = useState('Ing. Carlos Mendoza');
-  const [entregadoPor, setEntregadoPor] = useState('Luis Márquez (Operador)');
+  const [recibidoPor, setRecibidoPor] = useState('MEC-001');
+  const [entregadoPor, setEntregadoPor] = useState('');
   const [sintomas, setSintomas] = useState('Ruido metálico al frenar y vibración en el volante sobre 60 km/h.');
   const [esReincidencia, setEsReincidencia] = useState(true);
   const [osAnterior, setOsAnterior] = useState('OS-2026-00089');
@@ -92,6 +109,17 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
   const [fotosCount, setFotosCount] = useState(1);
   const [recibeConforme, setRecibeConforme] = useState('');
   const [fEntrega, setFEntrega] = useState('');
+
+  // Listas maestras desde Profit Plus MSSQL (ad_trans)
+  const [mecanicosList, setMecanicosList] = useState<MecanicoProfitItem[]>([]);
+  const [mecanicosLoading, setMecanicosLoading] = useState(false);
+  const [mecanicoSearch, setMecanicoSearch] = useState('');
+  const [showMecanicosDropdown, setShowMecanicosDropdown] = useState(false);
+
+  const [vendedoresList, setVendedoresList] = useState<VendedorProfitItem[]>([]);
+  const [vendedoresLoading, setVendedoresLoading] = useState(false);
+  const [vendedorSearch, setVendedorSearch] = useState('');
+  const [showVendedoresDropdown, setShowVendedoresDropdown] = useState(false);
 
   // Listas de trabajo de la orden actual
   const [ots, setOts] = useState<AreaOT[]>([]);
@@ -127,6 +155,8 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
   useEffect(() => {
     cargarCatalogo();
     cargarDatosEmpresa();
+    cargarMecanicos();
+    cargarVendedores();
   }, [activeCompany?.id, token]);
 
   // Cargar orden actual cuando cambia el número de orden
@@ -135,6 +165,39 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
       cargarOrdenActual(ordNo);
     }
   }, [ordNo]);
+
+  const cargarMecanicos = async () => {
+    setMecanicosLoading(true);
+    try {
+      const res = await authFetch('/api/v1/profit/mecanicos?limit=1000&sortBy=nombre&sortOrder=ASC');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setMecanicosList(data.data);
+        if (data.data.length > 0 && (!recibidoPor || recibidoPor === 'Ing. Carlos Mendoza')) {
+          setRecibidoPor(data.data[0].codigo);
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando mecanicos:', err);
+    } finally {
+      setMecanicosLoading(false);
+    }
+  };
+
+  const cargarVendedores = async () => {
+    setVendedoresLoading(true);
+    try {
+      const res = await authFetch('/api/v1/profit/vendedores?limit=1000&sortBy=ven_des&sortOrder=ASC');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setVendedoresList(data.data);
+      }
+    } catch (err) {
+      console.error('Error cargando vendedores:', err);
+    } finally {
+      setVendedoresLoading(false);
+    }
+  };
 
   const cargarCatalogo = async () => {
     try {
@@ -727,21 +790,192 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
                 className="mono"
               />
             </label>
-            <label className="f">
-              <span className="req">Recibido por</span>
-              <input
-                value={recibidoPor}
-                onChange={(e) => setRecibidoPor(e.target.value)}
-              />
-            </label>
-            <label className="f">
-              <span>Entregado por</span>
-              <input
-                value={entregadoPor}
-                onChange={(e) => setEntregadoPor(e.target.value)}
-                placeholder="Conductor u operador"
-              />
-            </label>
+
+            {/* Recibido por: Lista sin paginar de Mecánicos con búsqueda por nombre y guardado de código */}
+            <div className="f" style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span className="req" style={{ fontWeight: 600, fontSize: 13 }}>Recibido por (Mecánico)</span>
+                <span style={{ fontSize: 11, color: 'var(--slate)', fontFamily: 'monospace' }}>
+                  Código: <b style={{ color: 'var(--navy)' }}>{recibidoPor || 'Sin asignar'}</b>
+                </span>
+              </div>
+
+              {/* Selector interactivo con búsqueda y lista total sin paginar */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={mecanicoSearch}
+                    onChange={(e) => {
+                      setMecanicoSearch(e.target.value);
+                      setShowMecanicosDropdown(true);
+                    }}
+                    onFocus={() => setShowMecanicosDropdown(true)}
+                    placeholder={
+                      mecanicosList.find(m => m.codigo === recibidoPor)
+                        ? `[${recibidoPor}] ${mecanicosList.find(m => m.codigo === recibidoPor)?.nombre}`
+                        : "Buscar mecánico por nombre o código..."
+                    }
+                    style={{ paddingRight: 30 }}
+                  />
+                  <div
+                    onClick={() => setShowMecanicosDropdown(!showMecanicosDropdown)}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--slate)' }}
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
+                </div>
+
+                {/* Dropdown flotante con lista completa de mecánicos */}
+                {showMecanicosDropdown && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 50,
+                      background: '#ffffff',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
+                      maxHeight: 250,
+                      overflowY: 'auto',
+                      marginTop: 4,
+                      padding: 4,
+                    }}
+                  >
+                    <div style={{ padding: '6px 8px', fontSize: 11, color: 'var(--slate)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Mecánicos en ad_trans.dbo.mecanicos ({mecanicosList.length} total)</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowMecanicosDropdown(false)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--navy)', fontWeight: 600 }}
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                    {mecanicosLoading ? (
+                      <div style={{ padding: 12, textAlign: 'center', fontSize: 12, color: 'var(--slate)' }}>Cargando catálogo de mecánicos...</div>
+                    ) : (
+                      (() => {
+                        const filtrados = mecanicosList.filter(m => {
+                          if (!mecanicoSearch.trim()) return true;
+                          const t = mecanicoSearch.toLowerCase();
+                          return m.nombre.toLowerCase().includes(t) || m.codigo.toLowerCase().includes(t) || (m.cargo && m.cargo.toLowerCase().includes(t));
+                        });
+
+                        if (filtrados.length === 0) {
+                          return (
+                            <div style={{ padding: 12, textAlign: 'center', fontSize: 12, color: 'var(--slate)' }}>
+                              No se encontraron mecánicos con el término "{mecanicoSearch}"
+                            </div>
+                          );
+                        }
+
+                        return filtrados.map(m => {
+                          const isSelected = recibidoPor === m.codigo;
+                          return (
+                            <div
+                              key={m.codigo}
+                              onClick={() => {
+                                setRecibidoPor(m.codigo);
+                                setMecanicoSearch('');
+                                setShowMecanicosDropdown(false);
+                              }}
+                              style={{
+                                padding: '8px 10px',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                background: isSelected ? '#f0fdf4' : 'transparent',
+                                borderBottom: '1px solid #f1f5f9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                transition: 'background 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 12, color: 'var(--navy)', background: '#e2e8f0', padding: '1px 5px', borderRadius: 4 }}>
+                                    {m.codigo}
+                                  </span>
+                                  <span style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>
+                                    {m.nombre}
+                                  </span>
+                                  {m.activo && (
+                                    <span style={{ fontSize: 10, background: '#dcfce7', color: '#15803d', padding: '1px 4px', borderRadius: 3, fontWeight: 600 }}>
+                                      Activo
+                                    </span>
+                                  )}
+                                </div>
+                                {m.cargo && (
+                                  <span style={{ fontSize: 11, color: 'var(--slate)', marginTop: 2 }}>
+                                    {m.cargo}
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-emerald-600" />}
+                            </div>
+                          );
+                        });
+                      })()
+                    )}
+                  </div>
+                )}
+
+                {/* Selector rápido fallback */}
+                <select
+                  value={recibidoPor}
+                  onChange={(e) => setRecibidoPor(e.target.value)}
+                  style={{ fontSize: 12, padding: '4px 8px' }}
+                >
+                  <option value="">-- Seleccione Código de Mecánico --</option>
+                  {mecanicosList.map(m => (
+                    <option key={m.codigo} value={m.codigo}>
+                      [{m.codigo}] {m.nombre} {m.cargo ? `— ${m.cargo}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Entregado por: Desplegable desde vw_flota_vendedores */}
+            <div className="f" style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>Entregado por (Conductor/Vendedor)</span>
+                <span style={{ fontSize: 11, color: 'var(--slate)' }}>vw_flota_vendedores</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <select
+                  value={entregadoPor}
+                  onChange={(e) => setEntregadoPor(e.target.value)}
+                >
+                  <option value="">-- Seleccione Conductor / Vendedor --</option>
+                  {vendedoresList.map(v => (
+                    <option key={v.co_ven} value={v.ven_des}>
+                      [{v.co_ven}] {v.ven_des} {v.cedula ? `(C.I: ${v.cedula})` : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Input opcional para especificar nombre o búsqueda rápida */}
+                <input
+                  type="text"
+                  value={entregadoPor}
+                  onChange={(e) => setEntregadoPor(e.target.value)}
+                  placeholder="O ingrese nombre de operador..."
+                  style={{ fontSize: 12, padding: '4px 8px' }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -840,11 +1074,21 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
                 value={formArea.mecanico}
                 onChange={(e) => setFormArea({ ...formArea, mecanico: e.target.value })}
               >
-                <option>José Ramírez</option>
-                <option>Luis Márquez</option>
-                <option>Ana Peña</option>
-                <option>Carlos Ojeda</option>
-                <option>Miguel Sanz</option>
+                {mecanicosList.length > 0 ? (
+                  mecanicosList.map((m) => (
+                    <option key={m.codigo} value={m.nombre}>
+                      [{m.codigo}] {m.nombre} {m.cargo ? `(${m.cargo})` : ''}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option>José Gregorio Hernández Ramírez</option>
+                    <option>Luis Márquez</option>
+                    <option>Ana Peña</option>
+                    <option>Carlos Ojeda</option>
+                    <option>Miguel Sanz</option>
+                  </>
+                )}
               </select>
             </label>
             <label className="f">
