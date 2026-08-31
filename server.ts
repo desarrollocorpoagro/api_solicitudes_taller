@@ -9,13 +9,14 @@ import swaggerUi from 'swagger-ui-express';
 import { createServer as createViteServer } from 'vite';
 
 import { initDatabase } from './src/backend/config/database';
-import { initProfitDatabase } from './src/backend/config/profitDb';
+import { initProfitDatabase, initProfitMirrorSchema, seedProfitMirrorFromMain } from './src/backend/config/profitDb';
 import { seedInitialData } from './src/backend/models';
 import apiRoutes from './src/backend/routes';
 import swaggerDocument from './src/backend/config/swagger';
 import { logger, morganStream } from './src/backend/utils/logger';
 import { apiRateLimiter } from './src/backend/middlewares/rateLimiter.middleware';
 import { SyncService } from './src/backend/services/sync.service';
+import { MasterSyncService } from './src/backend/services/masterSync.service';
 import { runAllUnitTests } from './src/backend/tests/unitTests';
 
 dotenv.config();
@@ -129,8 +130,17 @@ async function startServer() {
     await initDatabase();
     await seedInitialData();
     await initProfitDatabase();
+    // Asegurar que el espejo SQLite local (./data/profit_ad_trans.sqlite) tenga las tablas
+    // antes de iniciar la sincronización bidireccional. Sin esto, el primer ciclo fallaría
+    // al intentar INSERT en tablas inexistentes.
+    await initProfitMirrorSchema();
+    await seedProfitMirrorFromMain();
     // Iniciar motor de verificación periódica de conectividad y sincronización offline-first
     SyncService.startBackgroundSync(15000);
+    // Iniciar motor de sincronización bidireccional de datos maestros
+    // (mecánicos, vendedores, artículos y flota_ordenes_servicio).
+    // Ejecuta un ciclo inmediato de poblado/inserción y luego continúa cada 30s.
+    MasterSyncService.startBackgroundMasterSync(30000);
   } catch (dbErr: any) {
     logger.error(`[DatabaseInit] Error inicializando bases de datos: ${dbErr.message}`);
   }
