@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <style>
+      .sl-h-text { font-family: 'Rubik', 'Montserrat', 'Arial Black', sans-serif; font-weight: 800; font-style: italic; }
+      .sl-sub-text { font-family: 'Rubik', 'Montserrat', sans-serif; font-weight: 700; font-style: italic; }
+    </style>
+  </defs>
+
+  <!-- Isotipo Badge (Centered) -->
+  <g transform="translate(140, 40)">
+    <g transform="skewX(-14) translate(20, 0)">
+      <rect x="5" y="5" width="85" height="100" rx="22" ry="22" fill="#002D62" />
+      <rect x="9" y="9" width="77" height="92" rx="18" ry="18" fill="#FFFFFF" />
+      <path d="M 28 14 L 68 14 C 77 14, 82 20, 82 28 L 82 45 L 52 45 L 52 56 L 82 56 L 82 72 C 82 80, 77 86, 68 86 L 28 86 C 19 86, 14 80, 14 72 L 14 28 C 14 20, 19 14, 28 14 Z" fill="#76BC21" />
+      <path d="M 24 52 L 48 52 L 48 44 L 78 44 L 78 76 C 78 86, 70 94, 58 94 L 28 94 C 18 94, 15 88, 15 80 L 24 52 Z" fill="#002D62" />
+      <path d="M 32 26 L 48 26 L 48 68 L 68 68 L 68 80 L 32 80 Z" fill="#FFFFFF" />
+    </g>
+  </g>
+
+  <!-- SAN LUIS Text -->
+  <text x="200" y="240" text-anchor="middle" class="sl-h-text" font-size="54" fill="#002D62" letter-spacing="1">SAN LUIS</text>
+
+  <!-- HIDROCARBUROS Badge + Lines -->
+  <g transform="translate(45, 260)">
+    <!-- Blue Box with HIDROCARBUROS text -->
+    <rect x="0" y="0" width="140" height="22" fill="#002D62" rx="3" ry="3" />
+    <text x="70" y="16" text-anchor="middle" class="sl-sub-text" font-size="11" fill="#FFFFFF" letter-spacing="1.5">HIDROCARBUROS</text>
+
+    <!-- 3 Green Stripes -->
+    <g transform="translate(146, 5)">
+      <rect x="0" y="0" width="165" height="2.5" fill="#76BC21" rx="1" />
+      <rect x="0" y="4.5" width="165" height="2.5" fill="#76BC21" rx="1" />
+      <rect x="0" y="9" width="165" height="2.5" fill="#76BC21" rx="1" />
+    </g>
+  </g>
+</svg>

@@ -16,6 +16,7 @@ import {
   Send,
   User
 } from 'lucide-react';
+import SanLuisLogo from './SanLuisLogo';
 
 interface LoginScreenProps {
   onLoginSuccess: (data: {
@@ -162,18 +163,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             gap: 10,
           }}
         >
-          <div className="mark" style={{ justifyContent: 'center' }}>
-            <div className="mark-tile">
-              <span style={{ color: 'var(--navy)', fontWeight: 800, fontSize: 22, fontStyle: 'italic' }}>
-                SL
-              </span>
-            </div>
-            <div className="mark-txt">
-              <span style={{ fontSize: 20 }}>GRUPO SAN LUIS</span>
-              <i />
-            </div>
-          </div>
-          <p style={{ fontSize: 13, color: '#9DB8D4', margin: 0, letterSpacing: '.3px' }}>
+          <SanLuisLogo variant="inverse" height={44} />
+          <p style={{ fontSize: 13, color: '#9DB8D4', margin: '4px 0 0', letterSpacing: '.3px' }}>
             Portal Integral de Taller y Gestión de Flota Multi-Tenant
           </p>
         </div>

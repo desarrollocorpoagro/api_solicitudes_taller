@@ -20,6 +20,7 @@ import MultimediaModule from './components/MultimediaModule';
 import TestConsoleModule from './components/TestConsoleModule';
 import SyncStatusBadge from './components/SyncStatusBadge';
 import RoleSimulatorBar from './components/RoleSimulatorBar';
+import SanLuisLogo from './components/SanLuisLogo';
 
 export default function App() {
   const [token, setToken] = useState<string>('');
@@ -128,15 +129,7 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-in">
           <div className="flex items-center gap-3">
-            <div className="mark">
-              <div className="mark-tile">
-                <span className="text-[#003366] font-extrabold text-lg italic tracking-tighter">SL</span>
-              </div>
-              <div className="mark-txt">
-                <span>GRUPO SAN LUIS</span>
-                <i />
-              </div>
-            </div>
+            <SanLuisLogo variant="inverse" height={30} subtext="Taller & Flota" />
           </div>
 
           {/* Selector de Tenant / Empresa Activa & Usuario & Sync & Logout */}

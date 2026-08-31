@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Image, Upload, Trash2, FileText, CheckCircle, ExternalLink } from 'lucide-react';
+import { Image, Upload, Trash2, FileText, CheckCircle, ExternalLink, Download, Copy, Shield, Sparkles } from 'lucide-react';
+import SanLuisLogo from './SanLuisLogo';
 
 export const MultimediaModule: React.FC = () => {
   const [files, setFiles] = useState<any[]>([]);
@@ -170,6 +171,121 @@ export const MultimediaModule: React.FC = () => {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Manual de Identidad y Respaldo Oficial de Logotipos */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-[#002D62]" />
+              Manual de Identidad & Respaldo Oficial de Logotipos San Luis
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Activos vectoriales oficiales disponibles en el sistema para reportes, membretes, firmas y aplicaciones corporativas.
+            </p>
+          </div>
+          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" /> Vector SVG de Alta Fidelidad
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          {/* 1. Logo Versión Claro */}
+          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 flex flex-col justify-between space-y-3">
+            <div>
+              <span className="text-[11px] uppercase font-bold text-slate-500 block mb-3">Versión Principal (Fondo Claro)</span>
+              <div className="bg-white p-4 rounded-lg border border-slate-200 flex items-center justify-center min-h-[90px]">
+                <SanLuisLogo variant="light" height={44} />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <a
+                href="/images/sanluis-logo.svg"
+                download="sanluis-logo-claro.svg"
+                className="flex-1 text-center bg-[#002D62] text-white py-1.5 px-3 rounded-lg text-xs font-semibold hover:bg-[#001f3f] flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar SVG
+              </a>
+            </div>
+          </div>
+
+          {/* 2. Logo Versión Inverso */}
+          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 flex flex-col justify-between space-y-3">
+            <div>
+              <span className="text-[11px] uppercase font-bold text-slate-500 block mb-3">Versión Inversa (Fondo Oscuro)</span>
+              <div className="bg-[#002347] p-4 rounded-lg border border-slate-800 flex items-center justify-center min-h-[90px]">
+                <SanLuisLogo variant="inverse" height={44} />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <a
+                href="/images/sanluis-logo-inverse.svg"
+                download="sanluis-logo-oscuro.svg"
+                className="flex-1 text-center bg-[#002D62] text-white py-1.5 px-3 rounded-lg text-xs font-semibold hover:bg-[#001f3f] flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar SVG
+              </a>
+            </div>
+          </div>
+
+          {/* 3. Logo Hidrocarburos & Isotipo */}
+          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 flex flex-col justify-between space-y-3">
+            <div>
+              <span className="text-[11px] uppercase font-bold text-slate-500 block mb-3">San Luis Hidrocarburos & Isotipo</span>
+              <div className="bg-white p-3 rounded-lg border border-slate-200 flex items-center justify-center gap-4 min-h-[90px]">
+                <SanLuisLogo variant="isotype" height={48} />
+                <div className="border-l border-slate-200 pl-3">
+                  <SanLuisLogo variant="hidrocarburos" height={58} />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <a
+                href="/images/sanluis-logo-hidro.svg"
+                download="sanluis-hidrocarburos.svg"
+                className="flex-1 text-center bg-[#002D62] text-white py-1.5 px-3 rounded-lg text-xs font-semibold hover:bg-[#001f3f] flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" /> Hidrocarburos SVG
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Paleta Oficial */}
+        <div className="pt-2 border-t border-slate-200 text-xs">
+          <span className="font-bold text-slate-700 block mb-2">Paleta Cromática Institucional:</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="w-6 h-6 rounded bg-[#002D62] shadow-inner" />
+              <div>
+                <b className="block text-slate-800">Azul Marino</b>
+                <span className="font-mono text-[10px] text-slate-500">#002D62</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="w-6 h-6 rounded bg-[#76BC21] shadow-inner" />
+              <div>
+                <b className="block text-slate-800">Verde Lima</b>
+                <span className="font-mono text-[10px] text-slate-500">#76BC21</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="w-6 h-6 rounded bg-[#002347] shadow-inner" />
+              <div>
+                <b className="block text-slate-800">Azul Profundo</b>
+                <span className="font-mono text-[10px] text-slate-500">#002347</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="w-6 h-6 rounded bg-[#FFFFFF] border border-slate-300 shadow-inner" />
+              <div>
+                <b className="block text-slate-800">Blanco Puro</b>
+                <span className="font-mono text-[10px] text-slate-500">#FFFFFF</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

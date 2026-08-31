@@ -27,6 +27,7 @@ import {
   Save,
 } from 'lucide-react';
 import { OrdenAuditHistory } from './OrdenAuditHistory';
+import SanLuisLogo from './SanLuisLogo';
 
 interface MecanicoProfitItem {
   codigo: string;
@@ -683,18 +684,21 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
       {/* Banner de Contexto de Empresa y Selector de Órdenes */}
       <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid var(--navy)', background: '#ffffff' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="chip" style={{ background: 'var(--navy)', color: '#ffffff', fontWeight: 600 }}>
-                🏢 {activeCompany?.name || 'Empresa Activa'}
-              </span>
-              <span style={{ fontSize: 13, color: 'var(--slate)', fontWeight: 500 }}>
-                RIF: {activeCompany?.taxId || 'N/A'}
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <SanLuisLogo variant="light" height={36} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span className="chip" style={{ background: 'var(--navy)', color: '#ffffff', fontWeight: 600 }}>
+                  🏢 {activeCompany?.name || 'Empresa Activa'}
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--slate)', fontWeight: 500 }}>
+                  RIF: {activeCompany?.taxId || 'N/A'}
+                </span>
+              </div>
+              <p className="hint" style={{ marginTop: 4, marginBottom: 0, fontSize: 12 }}>
+                Gestión de Taller & Flota ({companyFleet.length} unidades registradas) • Orden activa: <b className="mono text-navy">{ordNo}</b>
+              </p>
             </div>
-            <p className="hint" style={{ marginTop: 4, marginBottom: 0, fontSize: 13 }}>
-              Visualizando únicamente flota ({companyFleet.length} unidades) y órdenes ({companyOrders.length} registradas) de esta empresa.
-            </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -1787,6 +1791,16 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
       {/* 07 CIERRE */}
       <div className={`panel ${activeTab === 'cierre' ? 'on' : ''}`}>
         <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16, borderBottom: '1px solid var(--line-soft)', paddingBottom: 12 }}>
+            <SanLuisLogo variant="light" height={40} subtext="Liquidación Técnica" />
+            <div style={{ textAlign: 'right' }}>
+              <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--navy)' }}>{ordNo}</span>
+              <div style={{ fontSize: 11, color: 'var(--slate)' }}>
+                {activeCompany?.name} • RIF: {activeCompany?.taxId}
+              </div>
+            </div>
+          </div>
+
           <h2>Liquidación Financiera</h2>
           <p className="hint">El costo se imputa a la empresa propietaria de la unidad y a su centro de costo.</p>
 

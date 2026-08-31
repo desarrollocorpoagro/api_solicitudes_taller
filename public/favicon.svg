@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="limeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#84cc16"/>
+      <stop offset="100%" stop-color="#65a30d"/>
+    </linearGradient>
+    <linearGradient id="navyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#003366"/>
+      <stop offset="100%" stop-color="#001f3f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Rounded Shield -->
+  <g transform="skewX(-14) translate(14, 0)">
+    <!-- Outer Navy Stroke -->
+    <rect x="12" y="8" width="68" height="84" rx="20" ry="20" fill="#002D62" />
+    <rect x="15" y="11" width="62" height="78" rx="17" ry="17" fill="#ffffff" />
+    
+    <!-- Top Left Lime Element -->
+    <path d="M 32 15 L 60 15 C 68 15, 73 20, 73 28 L 73 38 L 48 38 L 48 48 L 73 48 L 73 60 C 73 68, 68 73, 60 73 L 32 73 C 24 73, 19 68, 19 60 L 19 28 C 19 20, 24 15, 32 15 Z" fill="#76BC21" />
+
+    <!-- Bottom Right Navy L/S Element with inner cut -->
+    <path d="M 23 48 L 44 48 L 44 40 L 69 40 L 69 64 C 69 74, 61 81, 51 81 L 28 81 C 21 81, 19 75, 19 70 L 23 48 Z" fill="#002D62" />
+    
+    <!-- Central White Letter L cut -->
+    <path d="M 32 26 L 46 26 L 46 62 L 63 62 L 63 72 L 32 72 Z" fill="#ffffff" />
+  </g>
+</svg>
