@@ -1,6 +1,6 @@
 {
   "name": "Backend San Luis - Taller & Multi-Tenant API",
-  "description": "Módulo de backend con Node.js, Express, Sequelize (MSSQL/SQLite), autenticación JWT, validación Joi, Swagger, panel de control de usuarios, órdenes de servicio de taller, notificaciones y multimedia.",
+  "description": "Módulo de backend con Node.js, Express, Sequelize (MSSQL/SQLite), autenticación JWT, validación Joi, Swagger, historial de auditoría y trazabilidad operativa de OTs, panel de control de usuarios, órdenes de servicio de taller, notificaciones y multimedia.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

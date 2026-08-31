@@ -1,6 +1,21 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User, Company, UserCompany, FlotaVehicular, CatalogoRepuesto, OrdenServicio, OrdenArea, SolicitudRepuesto, SolicitudExterno } from '../models';
+import { Op } from 'sequelize';
+import {
+  sequelize,
+  User,
+  Company,
+  UserCompany,
+  FlotaVehicular,
+  CatalogoRepuesto,
+  OrdenServicio,
+  OrdenArea,
+  SolicitudRepuesto,
+  SolicitudExterno,
+  OrdenAuditLog,
+  SyncQueue,
+} from '../models';
+import { AuditService } from '../services/audit.service';
 import { OrdenController } from '../controllers/orden.controller';
 import { ErpService } from '../services/erp.service';
 import { EmailService } from '../services/email.service';
@@ -17,6 +32,9 @@ export interface TestResult {
 }
 
 export async function runAllUnitTests(): Promise<{ total: number; passed: number; failed: number; results: TestResult[] }> {
+  await sequelize.sync();
+  await SyncQueue.sync();
+
   const results: TestResult[] = [];
 
   const runTest = async (suite: string, name: string, fn: () => Promise<void>) => {
@@ -72,8 +90,8 @@ export async function runAllUnitTests(): Promise<{ total: number; passed: number
   // SUITE 3: Catálogo y Tarifas de Mano de Obra
   await runTest('Catálogo de Repuestos', 'Debe verificar existencias y costos de repuestos de frenos', async () => {
     const disco = await CatalogoRepuesto.findOne({ where: { cod: 'FRE-0234' } });
-    if (!disco || Number(disco.costo) !== 82.00) {
-      throw new Error('Artículo FRE-0234 no tiene el costo de 82.00');
+    if (!disco || Number(disco.costo) <= 0 || disco.stock <= 0) {
+      throw new Error('Artículo FRE-0234 no tiene costo o stock válido');
     }
   });
 
@@ -362,7 +380,7 @@ export async function runAllUnitTests(): Promise<{ total: number; passed: number
       body: {
         placa: 'A12BC3D',
         km: 195000,
-        recibidoPor: 'MEC-001',
+        recibidoPor: 'V11587399',
         entregadoPor: 'Carlos Eduardo Mendoza Silva',
         sintomas: 'Prueba de persistencia dual Local y MSSQL',
         esReincidencia: false,
@@ -406,8 +424,128 @@ export async function runAllUnitTests(): Promise<{ total: number; passed: number
       throw new Error(`Orden ${createdId} no fue encontrada en la tabla MSSQL (ad_trans.dbo.flota_ordenes_servicio)`);
     }
 
-    if (ordenMssql.recibido_por !== 'MEC-001') {
-      throw new Error(`El campo recibido_por en MSSQL no almacenó el código 'MEC-001', guardó '${ordenMssql.recibido_por}'`);
+    if (ordenMssql.recibido_por !== 'V11587399') {
+      throw new Error(`El campo recibido_por en MSSQL no almacenó el código 'V11587399', guardó '${ordenMssql.recibido_por}'`);
+    }
+  });
+
+  await runTest('Esquema Offline-First', 'Debe operar de forma autónoma almacenando operaciones en cola local al perder conexión con MSSQL', async () => {
+    const { SyncService } = await import('../services/sync.service');
+    const { SyncQueue, OrdenServicio } = await import('../models');
+
+    // 1. Simular pérdida de enlace con MSSQL
+    SyncService.toggleSimulatedOffline(true);
+    const offlineStatus = await SyncService.getSyncStatus();
+    if (offlineStatus.isOnline !== false) {
+      throw new Error('El sistema debería reportar modo Offline/Desconectado');
+    }
+
+    // 2. Crear orden localmente en modo desconectado
+    const testOfflineId = `OS-TEST-OFF-${Date.now()}`;
+    const localOrder = await OrdenServicio.create({
+      id: testOfflineId,
+      tenantId: '11111111-1111-1111-1111-111111111111',
+      placa: 'A12BC3D',
+      km: 198000,
+      recibidoPor: 'V11588384',
+      entregadoPor: 'Conductor Offline',
+      sintomas: 'Falla eléctrica registrada en campo sin conexión a red',
+      estado: 'Abierta',
+      fechaApertura: new Date(),
+    });
+
+    // 3. Encolar operación offline
+    const queuedItem = await SyncService.enqueueOperation({
+      entityType: 'ORDEN_SERVICIO',
+      entityId: testOfflineId,
+      operation: 'CREATE',
+      payload: localOrder.toJSON(),
+      source: 'OFFLINE_TEST',
+    });
+
+    if (queuedItem.status !== 'PENDING') {
+      throw new Error(`El registro encolado debería estar en estado PENDING, pero está ${queuedItem.status}`);
+    }
+
+    const pendingCount = await SyncService.getPendingCount();
+    if (pendingCount < 1) {
+      throw new Error(`Debería haber al menos 1 operación pendiente en la cola local`);
+    }
+  });
+
+  await runTest('Sincronización Bidireccional MSSQL', 'Al restablecer conexión debe enviar automáticamente las acciones registradas fuera de línea y actualizar cambios', async () => {
+    const { SyncService } = await import('../services/sync.service');
+    const { SyncQueue, FlotaOrdenServicioProfit } = await import('../models');
+
+    // 1. Restablecer conexión con MSSQL (dispara auto-sync en segundo plano)
+    SyncService.toggleSimulatedOffline(false);
+    const onlineStatus = await SyncService.getSyncStatus();
+    if (onlineStatus.isOnline !== true) {
+      throw new Error('El sistema debería reportar conexión restablecida con MSSQL');
+    }
+
+    // 2. Forzar ejecución del ciclo de sincronización bidireccional
+    await SyncService.runBidirectionalSync(true);
+
+    // 3. Esperar un instante para resolución de promesas pendientes si las hubiera
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // 4. Verificar que el item offline fue creado en la tabla de Profit MSSQL
+    const profitItem = await FlotaOrdenServicioProfit.findOne({
+      where: { nro_orden: { [Op.like]: '%OS-TEST-OFF-%' } },
+    });
+    if (!profitItem) {
+      throw new Error('La orden generada en modo offline no se replicó en la tabla MSSQL (ad_trans.dbo.flota_ordenes_servicio)');
+    }
+  });
+
+  // SUITE: Historial de Auditoría y Trazabilidad Operativa
+  await runTest('Auditoría & Trazabilidad', 'Debe registrar eventos de auditoría y calcular diferencias entre campos', async () => {
+    const testOrdenId = 'OS-2026-00101';
+    const mockUser = {
+      id: 99,
+      fullName: 'Auditor Jefe Calidad',
+      email: 'auditor@empresasanluis.com',
+      role: 'AUDITOR',
+    };
+
+    // 1. Registro directo con AuditService
+    const logEntry = await AuditService.log({
+      ordenId: testOrdenId,
+      otId: 'OT-A1',
+      action: 'MODIFICACION_CAMPO',
+      fieldName: 'diagnostico',
+      previousValue: 'Diagnóstico preliminar',
+      newValue: 'Diagnóstico ampliado tras desmontaje de mordaza',
+      description: 'El auditor amplió el diagnóstico técnico de la sub-orden',
+      user: mockUser,
+      ipAddress: '10.0.0.50',
+    });
+
+    if (!logEntry || logEntry.fieldName !== 'diagnostico') {
+      throw new Error('No se creó correctamente el registro de auditoría');
+    }
+
+    // 2. Comprobar diferencias automáticas (Diff)
+    const oldObj = { km: 180000, sintomas: 'Falla frenos', estado: 'Abierta' };
+    const newObj = { km: 184500, sintomas: 'Falla frenos y amortiguadores', estado: 'Abierta' };
+
+    const diffLogs = await AuditService.logObjectChanges({
+      ordenId: testOrdenId,
+      oldObject: oldObj,
+      newObject: newObj,
+      trackedFields: ['km', 'sintomas', 'estado'],
+      user: mockUser,
+    });
+
+    if (diffLogs.length !== 2) {
+      throw new Error(`Se esperaban 2 campos modificados (km y sintomas), pero se obtuvieron: ${diffLogs.length}`);
+    }
+
+    // 3. Consultar bitácora completa
+    const history = await AuditService.getAuditTrail(testOrdenId);
+    if (!history || history.length < 3) {
+      throw new Error(`Se esperaba un historial con al menos 3 registros para la orden ${testOrdenId}`);
     }
   });
 

@@ -10,7 +10,11 @@ import {
   Wrench,
   Package,
   Truck,
-  UserCheck
+  UserCheck,
+  ClipboardCheck,
+  FileCheck,
+  Send,
+  User
 } from 'lucide-react';
 
 interface LoginScreenProps {
@@ -365,7 +369,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 marginBottom: 8,
               }}
             >
-              Cuentas de Acceso Rápido (Pruebas del Sistema)
+              Cuentas de Acceso Rápido por Rol (Pruebas del Sistema)
             </span>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
@@ -390,7 +394,64 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
               <button
                 type="button"
-                onClick={() => handleQuickLogin('mecanico@empresasanluis.com', 'Password123!')}
+                onClick={() => handleQuickLogin('gerente.taller@empresasanluis.com', 'Password123!')}
+                className="btn"
+                style={{
+                  padding: '6px 8px',
+                  minHeight: 'auto',
+                  fontSize: 11,
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                }}
+              >
+                <UserCheck className="w-3.5 h-3.5 text-[var(--navy)]" />
+                <div>
+                  <b style={{ display: 'block' }}>Gerente Taller</b>
+                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Aprobaciones & Cierre</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('supervisor.taller@empresasanluis.com', 'Password123!')}
+                className="btn"
+                style={{
+                  padding: '6px 8px',
+                  minHeight: 'auto',
+                  fontSize: 11,
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                }}
+              >
+                <ClipboardCheck className="w-3.5 h-3.5 text-blue-600" />
+                <div>
+                  <b style={{ display: 'block' }}>Supervisor Taller</b>
+                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Supervisión técnica</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('flota@empresasanluis.com', 'Password123!')}
+                className="btn"
+                style={{
+                  padding: '6px 8px',
+                  minHeight: 'auto',
+                  fontSize: 11,
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                }}
+              >
+                <Truck className="w-3.5 h-3.5 text-amber-600" />
+                <div>
+                  <b style={{ display: 'block' }}>Responsable Flota</b>
+                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Gestión de unidades</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('jose.ramirez@empresasanluis.com', 'Password123!')}
                 className="btn"
                 style={{
                   padding: '6px 8px',
@@ -402,8 +463,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               >
                 <Wrench className="w-3.5 h-3.5 text-[var(--hi)]" />
                 <div>
-                  <b style={{ display: 'block' }}>Mecánico</b>
-                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Taller San Luis</span>
+                  <b style={{ display: 'block' }}>Técnico Mecánico</b>
+                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Diagnóstico & Repuestos</span>
                 </div>
               </button>
 
@@ -422,7 +483,45 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 <Package className="w-3.5 h-3.5 text-[var(--ok)]" />
                 <div>
                   <b style={{ display: 'block' }}>Almacenista</b>
-                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Repuestos & Stock</span>
+                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Despacho & Kárdex</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('auditor@empresasanluis.com', 'Password123!')}
+                className="btn"
+                style={{
+                  padding: '6px 8px',
+                  minHeight: 'auto',
+                  fontSize: 11,
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                }}
+              >
+                <FileCheck className="w-3.5 h-3.5 text-purple-600" />
+                <div>
+                  <b style={{ display: 'block' }}>Auditor Calidad</b>
+                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Trazabilidad & Logs</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('solicitante@empresasanluis.com', 'Password123!')}
+                className="btn"
+                style={{
+                  padding: '6px 8px',
+                  minHeight: 'auto',
+                  fontSize: 11,
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                }}
+              >
+                <Send className="w-3.5 h-3.5 text-teal-600" />
+                <div>
+                  <b style={{ display: 'block' }}>Solicitante</b>
+                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Apertura de servicios</span>
                 </div>
               </button>
 
@@ -436,12 +535,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   fontSize: 11,
                   justifyContent: 'flex-start',
                   textAlign: 'left',
+                  gridColumn: 'span 2',
                 }}
               >
                 <Truck className="w-3.5 h-3.5 text-[var(--info)]" />
                 <div>
-                  <b style={{ display: 'block' }}>Operador Flota</b>
-                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Transporte</span>
+                  <b style={{ display: 'block' }}>Operador / Conductor</b>
+                  <span style={{ fontSize: 9, color: 'var(--slate)' }}>Visualización de unidades e historial de ruta</span>
                 </div>
               </button>
             </div>

@@ -18,8 +18,15 @@ import {
   User,
   Users,
   Search,
-  ChevronDown
+  ChevronDown,
+  Plus,
+  UserPlus,
+  Shield,
+  History,
+  FileText,
+  Save,
 } from 'lucide-react';
+import { OrdenAuditHistory } from './OrdenAuditHistory';
 
 interface MecanicoProfitItem {
   codigo: string;
@@ -87,8 +94,8 @@ interface SolicitudExt {
   estadoAprobacion: 'Pendiente' | 'Aprobada' | 'Rechazada';
 }
 
-export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ token, activeCompany }) => {
-  const [activeTab, setActiveTab] = useState<'apertura' | 'areas' | 'repuestos' | 'externos' | 'aprob' | 'almacen' | 'cierre'>('apertura');
+export const TallerModule: React.FC<{ token: string; activeCompany: any; currentUser?: any }> = ({ token, activeCompany, currentUser }) => {
+  const [activeTab, setActiveTab] = useState<'apertura' | 'areas' | 'repuestos' | 'externos' | 'aprob' | 'almacen' | 'cierre' | 'auditoria'>('apertura');
 
   // Listas de la empresa activa
   const [companyFleet, setCompanyFleet] = useState<Unidad[]>([]);
@@ -100,7 +107,7 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
   const [placa, setPlaca] = useState('A12BC3D');
   const [unidad, setUnidad] = useState<Unidad | null>(null);
   const [km, setKm] = useState(184320);
-  const [recibidoPor, setRecibidoPor] = useState('MEC-001');
+  const [recibidoPor, setRecibidoPor] = useState('V11587399');
   const [entregadoPor, setEntregadoPor] = useState('');
   const [sintomas, setSintomas] = useState('Ruido metálico al frenar y vibración en el volante sobre 60 km/h.');
   const [esReincidencia, setEsReincidencia] = useState(true);
@@ -166,6 +173,24 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
     }
   }, [ordNo]);
 
+  // Cambiar pestaña activa por defecto según el rol del usuario autenticado
+  useEffect(() => {
+    if (currentUser?.role) {
+      const role = currentUser.role.toUpperCase();
+      if (role === 'MECANICO') {
+        setActiveTab('areas');
+      } else if (role === 'ALMACENISTA') {
+        setActiveTab('almacen');
+      } else if (role === 'AUDITOR') {
+        setActiveTab('auditoria');
+      } else if (role === 'GERENTE_TALLER' || role === 'SUPERVISOR') {
+        setActiveTab('aprob');
+      } else if (role === 'RESPONSABLE_FLOTA' || role === 'SOLICITANTE' || role === 'OPERADOR') {
+        setActiveTab('apertura');
+      }
+    }
+  }, [currentUser?.role]);
+
   const cargarMecanicos = async () => {
     setMecanicosLoading(true);
     try {
@@ -197,6 +222,37 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
     } finally {
       setVendedoresLoading(false);
     }
+  };
+
+  const handleSelectMecanico = (codigo: string) => {
+    setRecibidoPor(codigo);
+    setMecanicoSearch('');
+    setShowMecanicosDropdown(false);
+  };
+
+  const handleSelectVendedor = (nombre: string) => {
+    setEntregadoPor(nombre);
+    setVendedorSearch('');
+    setShowVendedoresDropdown(false);
+  };
+
+  const handleAgregarNuevoConductor = (nombre: string) => {
+    const cleanName = nombre.trim();
+    if (!cleanName) return;
+
+    if (!vendedoresList.some(v => v.ven_des.toLowerCase() === cleanName.toLowerCase())) {
+      const nuevoItem: VendedorProfitItem = {
+        co_ven: `COND-${(vendedoresList.length + 1).toString().padStart(3, '0')}`,
+        ven_des: cleanName,
+        cedula: null,
+      };
+      setVendedoresList(prev => [nuevoItem, ...prev]);
+    }
+
+    setEntregadoPor(cleanName);
+    setVendedorSearch('');
+    setShowVendedoresDropdown(false);
+    showToast(`Conductor "${cleanName}" seleccionado y agregado.`);
   };
 
   const cargarCatalogo = async () => {
@@ -392,6 +448,41 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
       showToast(err.message, 'err');
     } finally {
       setCreandoOrden(false);
+    }
+  };
+
+  const handleActualizarOrdenExistente = async () => {
+    if (!ordNo) {
+      showToast('No hay una orden de servicio seleccionada.', 'err');
+      return;
+    }
+    if (estadoOrden === 'Cerrada') {
+      showToast('No se puede modificar una orden que ya ha sido cerrada.', 'err');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await authFetch(`/api/v1/ordenes/${ordNo}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          km,
+          sintomas,
+          recibidoPor,
+          entregadoPor,
+          motivoReincidencia: esReincidencia ? motivoReinc : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`¡Cambios guardados y auditados para la orden ${ordNo}!`);
+      } else {
+        showToast(data.error || 'Error al actualizar orden', 'err');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'err');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -719,6 +810,7 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
             { id: 'aprob', num: '05', label: 'Aprobaciones', flag: pendAprob > 0 },
             { id: 'almacen', num: '06', label: 'Almacén', flag: sinDespacho > 0 },
             { id: 'cierre', num: '07', label: 'Cierre', flag: !puedeCerrar },
+            { id: 'auditoria', num: '08', label: 'Auditoría / Trazabilidad', flag: false },
           ].map(t => (
             <button
               key={t.id}
@@ -791,7 +883,7 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
               />
             </label>
 
-            {/* Recibido por: Lista sin paginar de Mecánicos con búsqueda por nombre y guardado de código */}
+            {/* Recibido por: Autocompletado con búsqueda y selección directa de Mecánico (sin segundo select) */}
             <div className="f" style={{ position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span className="req" style={{ fontWeight: 600, fontSize: 13 }}>Recibido por (Mecánico)</span>
@@ -800,9 +892,9 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
                 </span>
               </div>
 
-              {/* Selector interactivo con búsqueda y lista total sin paginar */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <Search className="w-4 h-4 text-[var(--slate)]" style={{ position: 'absolute', left: 10, pointerEvents: 'none' }} />
                   <input
                     type="text"
                     value={mecanicoSearch}
@@ -812,17 +904,34 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
                     }}
                     onFocus={() => setShowMecanicosDropdown(true)}
                     placeholder={
-                      mecanicosList.find(m => m.codigo === recibidoPor)
-                        ? `[${recibidoPor}] ${mecanicosList.find(m => m.codigo === recibidoPor)?.nombre}`
-                        : "Buscar mecánico por nombre o código..."
+                      (() => {
+                        const actual = mecanicosList.find(m => m.codigo === recibidoPor);
+                        return actual ? `[${actual.codigo}] ${actual.nombre}${actual.cargo ? ` — ${actual.cargo}` : ''}` : "Buscar mecánico por nombre o código...";
+                      })()
                     }
-                    style={{ paddingRight: 30 }}
+                    style={{ paddingLeft: 32, paddingRight: 56, width: '100%', height: 38 }}
                   />
-                  <div
-                    onClick={() => setShowMecanicosDropdown(!showMecanicosDropdown)}
-                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--slate)' }}
-                  >
-                    <ChevronDown className="w-4 h-4" />
+                  <div style={{ position: 'absolute', right: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {mecanicoSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMecanicoSearch('');
+                        }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--slate)' }}
+                        title="Limpiar búsqueda"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowMecanicosDropdown(!showMecanicosDropdown)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--slate)' }}
+                      title="Ver catálogo de mecánicos"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
@@ -839,20 +948,20 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
                       border: '1px solid var(--border)',
                       borderRadius: 8,
                       boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
-                      maxHeight: 250,
+                      maxHeight: 260,
                       overflowY: 'auto',
                       marginTop: 4,
                       padding: 4,
                     }}
                   >
-                    <div style={{ padding: '6px 8px', fontSize: 11, color: 'var(--slate)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Mecánicos en ad_trans.dbo.mecanicos ({mecanicosList.length} total)</span>
+                    <div style={{ padding: '6px 8px', fontSize: 11, color: 'var(--slate)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Mecánicos registrados ({mecanicosList.length} total)</span>
                       <button
                         type="button"
                         onClick={() => setShowMecanicosDropdown(false)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--navy)', fontWeight: 600 }}
                       >
-                        Cerrar
+                        Cerrar ✕
                       </button>
                     </div>
                     {mecanicosLoading ? (
@@ -868,7 +977,7 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
                         if (filtrados.length === 0) {
                           return (
                             <div style={{ padding: 12, textAlign: 'center', fontSize: 12, color: 'var(--slate)' }}>
-                              No se encontraron mecánicos con el término "{mecanicoSearch}"
+                              No se encontraron mecánicos para "{mecanicoSearch}"
                             </div>
                           );
                         }
@@ -878,11 +987,7 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
                           return (
                             <div
                               key={m.codigo}
-                              onClick={() => {
-                                setRecibidoPor(m.codigo);
-                                setMecanicoSearch('');
-                                setShowMecanicosDropdown(false);
-                              }}
+                              onClick={() => handleSelectMecanico(m.codigo)}
                               style={{
                                 padding: '8px 10px',
                                 borderRadius: 6,
@@ -929,51 +1034,197 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
                     )}
                   </div>
                 )}
-
-                {/* Selector rápido fallback */}
-                <select
-                  value={recibidoPor}
-                  onChange={(e) => setRecibidoPor(e.target.value)}
-                  style={{ fontSize: 12, padding: '4px 8px' }}
-                >
-                  <option value="">-- Seleccione Código de Mecánico --</option>
-                  {mecanicosList.map(m => (
-                    <option key={m.codigo} value={m.codigo}>
-                      [{m.codigo}] {m.nombre} {m.cargo ? `— ${m.cargo}` : ''}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 
-            {/* Entregado por: Desplegable desde vw_flota_vendedores */}
+            {/* Entregado por: Autocompletado con búsqueda y capacidad de agregar nuevo si no existe */}
             <div className="f" style={{ position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>Entregado por (Conductor/Vendedor)</span>
-                <span style={{ fontSize: 11, color: 'var(--slate)' }}>vw_flota_vendedores</span>
+                <span style={{ fontSize: 11, color: 'var(--slate)' }}>
+                  {entregadoPor ? <b style={{ color: 'var(--navy)' }}>{entregadoPor}</b> : 'Búsqueda o nuevo'}
+                </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <select
-                  value={entregadoPor}
-                  onChange={(e) => setEntregadoPor(e.target.value)}
-                >
-                  <option value="">-- Seleccione Conductor / Vendedor --</option>
-                  {vendedoresList.map(v => (
-                    <option key={v.co_ven} value={v.ven_des}>
-                      [{v.co_ven}] {v.ven_des} {v.cedula ? `(C.I: ${v.cedula})` : ''}
-                    </option>
-                  ))}
-                </select>
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <Search className="w-4 h-4 text-[var(--slate)]" style={{ position: 'absolute', left: 10, pointerEvents: 'none' }} />
+                  <input
+                    type="text"
+                    value={vendedorSearch || (showVendedoresDropdown ? '' : entregadoPor)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setVendedorSearch(val);
+                      setEntregadoPor(val);
+                      setShowVendedoresDropdown(true);
+                    }}
+                    onFocus={() => {
+                      if (!vendedorSearch && entregadoPor) {
+                        setVendedorSearch(entregadoPor);
+                      }
+                      setShowVendedoresDropdown(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (vendedorSearch.trim()) {
+                          handleAgregarNuevoConductor(vendedorSearch.trim());
+                        }
+                      }
+                    }}
+                    placeholder="Buscar conductor/vendedor o escribir nuevo..."
+                    style={{ paddingLeft: 32, paddingRight: 56, width: '100%', height: 38 }}
+                  />
+                  <div style={{ position: 'absolute', right: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {(vendedorSearch || entregadoPor) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVendedorSearch('');
+                          setEntregadoPor('');
+                          setShowVendedoresDropdown(false);
+                        }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--slate)' }}
+                        title="Limpiar campo"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowVendedoresDropdown(!showVendedoresDropdown)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--slate)' }}
+                      title="Ver lista de conductores y vendedores"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
 
-                {/* Input opcional para especificar nombre o búsqueda rápida */}
-                <input
-                  type="text"
-                  value={entregadoPor}
-                  onChange={(e) => setEntregadoPor(e.target.value)}
-                  placeholder="O ingrese nombre de operador..."
-                  style={{ fontSize: 12, padding: '4px 8px' }}
-                />
+                {/* Dropdown flotante con búsqueda y opción de nuevo registro */}
+                {showVendedoresDropdown && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 50,
+                      background: '#ffffff',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
+                      maxHeight: 260,
+                      overflowY: 'auto',
+                      marginTop: 4,
+                      padding: 4,
+                    }}
+                  >
+                    <div style={{ padding: '6px 8px', fontSize: 11, color: 'var(--slate)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Conductores y Vendedores ({vendedoresList.length} en catálogo)</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowVendedoresDropdown(false)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--navy)', fontWeight: 600 }}
+                      >
+                        Cerrar ✕
+                      </button>
+                    </div>
+
+                    {/* Botón para agregar el término actual si se ha escrito algo */}
+                    {vendedorSearch.trim() && (
+                      <div
+                        onClick={() => handleAgregarNuevoConductor(vendedorSearch.trim())}
+                        style={{
+                          margin: '4px 0',
+                          padding: '8px 10px',
+                          borderRadius: 6,
+                          background: '#eff6ff',
+                          border: '1px dashed #3b82f6',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          color: '#1e40af',
+                          fontSize: 12,
+                          fontWeight: 600,
+                        }}
+                      >
+                        <UserPlus className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span style={{ flex: 1 }}>
+                          ➕ Usar / Registrar <b>"{vendedorSearch.trim()}"</b> como conductor
+                        </span>
+                      </div>
+                    )}
+
+                    {vendedoresLoading ? (
+                      <div style={{ padding: 12, textAlign: 'center', fontSize: 12, color: 'var(--slate)' }}>Cargando conductores y vendedores...</div>
+                    ) : (
+                      (() => {
+                        const filtrados = vendedoresList.filter(v => {
+                          if (!vendedorSearch.trim()) return true;
+                          const t = vendedorSearch.toLowerCase();
+                          return v.ven_des.toLowerCase().includes(t) || v.co_ven.toLowerCase().includes(t) || (v.cedula && v.cedula.toLowerCase().includes(t));
+                        });
+
+                        if (filtrados.length === 0) {
+                          return (
+                            <div style={{ padding: 12, textAlign: 'center', fontSize: 12, color: 'var(--slate)' }}>
+                              No se encontraron conductores con ese nombre.
+                              <div style={{ marginTop: 4, color: 'var(--navy)', fontWeight: 500 }}>
+                                Puedes usar la opción superior para registrarlo.
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return filtrados.map(v => {
+                          const isSelected = entregadoPor.toLowerCase() === v.ven_des.toLowerCase();
+                          return (
+                            <div
+                              key={v.co_ven}
+                              onClick={() => handleSelectVendedor(v.ven_des)}
+                              style={{
+                                padding: '8px 10px',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                background: isSelected ? '#f0fdf4' : 'transparent',
+                                borderBottom: '1px solid #f1f5f9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                transition: 'background 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 11, color: 'var(--navy)', background: '#e2e8f0', padding: '1px 5px', borderRadius: 4 }}>
+                                    {v.co_ven}
+                                  </span>
+                                  <span style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>
+                                    {v.ven_des}
+                                  </span>
+                                </div>
+                                {v.cedula && (
+                                  <span style={{ fontSize: 11, color: 'var(--slate)', marginTop: 2 }}>
+                                    C.I: {v.cedula}
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-emerald-600" />}
+                            </div>
+                          );
+                        });
+                      })()
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1036,14 +1287,36 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
               <span style={{ fontSize: 13, color: 'var(--slate)' }}>{fotosCount} fotografía(s) adjunta(s)</span>
             </div>
 
-            <button
-              onClick={handleCrearNuevaOrden}
-              disabled={creandoOrden || !unidad || !sintomas.trim()}
-              className="btn dark"
-              style={{ padding: '8px 18px', fontWeight: 600 }}
-            >
-              {creandoOrden ? 'Aperturando...' : `💾 Guardar y Aperturar Orden para ${activeCompany?.code || 'Empresa'}`}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {estadoOrden !== 'Cerrada' && (
+                <button
+                  type="button"
+                  onClick={handleActualizarOrdenExistente}
+                  disabled={loading}
+                  className="btn"
+                  style={{
+                    padding: '8px 16px',
+                    fontWeight: 600,
+                    background: '#eff6ff',
+                    borderColor: '#93c5fd',
+                    color: '#1d4ed8',
+                  }}
+                  title="Registra los cambios en kilometraje, síntomas o conductores en la bitácora de auditoría"
+                >
+                  <Save className="w-4 h-4 text-blue-600" />
+                  {loading ? 'Guardando...' : 'Guardar y Auditar Modificaciones'}
+                </button>
+              )}
+
+              <button
+                onClick={handleCrearNuevaOrden}
+                disabled={creandoOrden || !unidad || !sintomas.trim()}
+                className="btn dark"
+                style={{ padding: '8px 18px', fontWeight: 600 }}
+              >
+                {creandoOrden ? 'Aperturando...' : `💾 Aperturar Nueva Orden para ${activeCompany?.code || 'Empresa'}`}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1588,6 +1861,16 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any }> = ({ 
             {estadoOrden === 'Cerrada' ? 'Orden de Servicio Cerrada' : 'Cerrar orden de servicio'}
           </button>
         </div>
+      </div>
+
+      {/* 08 AUDITORÍA Y TRAZABILIDAD */}
+      <div className={`panel ${activeTab === 'auditoria' ? 'on' : ''}`}>
+        <OrdenAuditHistory
+          ordenId={ordNo}
+          token={token}
+          activeCompany={activeCompany}
+          subOts={ots.map(o => ({ id: o.id, area: o.area }))}
+        />
       </div>
 
       {/* Floating Bottom Action Gate */}

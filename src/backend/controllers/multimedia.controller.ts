@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { StorageService } from '../services/storage.service';
 import { Multimedia, OrdenServicio } from '../models';
+import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 
 export class MultimediaController {
@@ -18,13 +19,22 @@ export class MultimediaController {
 
       const multimedia = await StorageService.saveFile(file, ordenId, tipo || 'foto_sintoma');
 
-      // Si viene con ordenId, incrementar el contador de fotos en la orden
+      // Si viene con ordenId, incrementar el contador de fotos en la orden y registrar auditoría
       if (ordenId) {
         const orden = await OrdenServicio.findByPk(ordenId);
         if (orden) {
           orden.fotosCount = (orden.fotosCount || 0) + 1;
           await orden.save();
         }
+
+        await AuditService.recordLog({
+          ordenId,
+          action: 'SUBIDA_MULTIMEDIA',
+          fieldName: 'multimedia',
+          newValue: file.originalname,
+          description: `Evidencia fotográfica o archivo adjunto cargado: "${file.originalname}" (${tipo || 'foto_sintoma'}, ${(file.size / 1024).toFixed(1)} KB)`,
+          req,
+        });
       }
 
       logger.info(`[MultimediaController] Archivo subido exitosamente: ${file.originalname} -> ${multimedia.url}`);

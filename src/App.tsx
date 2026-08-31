@@ -18,6 +18,8 @@ import SwaggerModule from './components/SwaggerModule';
 import NotificationsModule from './components/NotificationsModule';
 import MultimediaModule from './components/MultimediaModule';
 import TestConsoleModule from './components/TestConsoleModule';
+import SyncStatusBadge from './components/SyncStatusBadge';
+import RoleSimulatorBar from './components/RoleSimulatorBar';
 
 export default function App() {
   const [token, setToken] = useState<string>('');
@@ -79,6 +81,42 @@ export default function App() {
     }
   };
 
+  const handleSwitchRole = async (userEmail: string) => {
+    setLoading(true);
+    try {
+      const resLogin = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail, password: 'Password123!' }),
+      });
+      const dataLogin = await resLogin.json();
+      if (dataLogin.success && dataLogin.companies?.length > 0) {
+        const matchingComp = dataLogin.companies.find((c: any) => c.id === activeCompany?.id);
+        const compIdToSelect = matchingComp ? matchingComp.id : dataLogin.companies[0].id;
+
+        const resSelect = await fetch('/api/v1/auth/select-company', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${dataLogin.preAuthToken}`,
+          },
+          body: JSON.stringify({ companyId: compIdToSelect }),
+        });
+        const dataSelect = await resSelect.json();
+        if (dataSelect.success) {
+          setToken(dataSelect.token);
+          setUser(dataLogin.user);
+          setActiveCompany(dataSelect.activeCompany);
+          setCompanies(dataLogin.companies);
+        }
+      }
+    } catch (err) {
+      console.error('Error al cambiar de rol de prueba:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Si no hay sesión activa, mostrar la pantalla de Login
   if (!token || !user || !activeCompany) {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
@@ -101,8 +139,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* Selector de Tenant / Empresa Activa & Usuario & Logout */}
+          {/* Selector de Tenant / Empresa Activa & Usuario & Sync & Logout */}
           <div className="flex items-center gap-3 flex-wrap">
+            <SyncStatusBadge token={token} />
+
             <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-[var(--r)] border border-white/20">
               <Building2 className="w-4 h-4 text-[var(--lime)]" />
               <div>
@@ -173,9 +213,17 @@ export default function App() {
         </div>
       </header>
 
+      {/* Simulador y Selector Rápido de Roles para Pruebas */}
+      <RoleSimulatorBar
+        currentUser={user}
+        activeCompany={activeCompany}
+        onSwitchRole={handleSwitchRole}
+        loading={loading}
+      />
+
       {/* Contenido Principal */}
       <main className="flex-1 w-full max-w-[1120px] mx-auto p-4 sm:p-6">
-        {activeNav === 'taller' && <TallerModule token={token} activeCompany={activeCompany} />}
+        {activeNav === 'taller' && <TallerModule token={token} activeCompany={activeCompany} currentUser={user} />}
         {activeNav === 'usuarios' && <UserManagementModule token={token} currentUser={user} />}
         {activeNav === 'swagger' && <SwaggerModule />}
         {activeNav === 'notificaciones' && <NotificationsModule />}

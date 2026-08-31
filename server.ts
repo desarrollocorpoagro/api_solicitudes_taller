@@ -15,6 +15,7 @@ import apiRoutes from './src/backend/routes';
 import swaggerDocument from './src/backend/config/swagger';
 import { logger, morganStream } from './src/backend/utils/logger';
 import { apiRateLimiter } from './src/backend/middlewares/rateLimiter.middleware';
+import { SyncService } from './src/backend/services/sync.service';
 import { runAllUnitTests } from './src/backend/tests/unitTests';
 
 dotenv.config();
@@ -128,6 +129,8 @@ async function startServer() {
     await initDatabase();
     await seedInitialData();
     await initProfitDatabase();
+    // Iniciar motor de verificación periódica de conectividad y sincronización offline-first
+    SyncService.startBackgroundSync(15000);
   } catch (dbErr: any) {
     logger.error(`[DatabaseInit] Error inicializando bases de datos: ${dbErr.message}`);
   }

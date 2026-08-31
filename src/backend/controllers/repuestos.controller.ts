@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { SolicitudRepuesto, CatalogoRepuesto, OrdenServicio, OrdenArea } from '../models';
 import { EmailService } from '../services/email.service';
+import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 
 export class RepuestosController {
@@ -49,6 +50,17 @@ export class RepuestosController {
         EmailService.notifyEscalamientoFlota(articulo.desc, costoTotal, ordenId, otId);
       }
 
+      // Registrar auditoría
+      await AuditService.recordLog({
+        ordenId,
+        otId,
+        action: 'SOLICITUD_REPUESTO',
+        fieldName: 'repuesto',
+        newValue: `${articulo.cod} (${cantidad} unid)`,
+        description: `Solicitud de repuesto ${articulo.cod} ("${articulo.desc}") × ${cantidad} unid. Costo estimado: $${costoTotal} ($${costoUnitario}/u). Motivo: "${motivo || 'Requerimiento técnico'}"`,
+        req,
+      });
+
       logger.info(`[RepuestosController] Solicitud de repuesto creada: ${articulo.cod} x ${cantidad} para ${ordenId} (${otId})`);
 
       return res.status(201).json({
@@ -78,7 +90,21 @@ export class RepuestosController {
         });
       }
 
+      const repDesc = `${solicitud.cod} - ${solicitud.desc} x ${solicitud.cant}`;
+      const otId = solicitud.otId;
       await solicitud.destroy();
+
+      await AuditService.recordLog({
+        ordenId,
+        otId,
+        action: 'ANULACION_REPUESTO',
+        fieldName: 'repuesto',
+        previousValue: repDesc,
+        newValue: null,
+        description: `Anulación de solicitud de repuesto: ${repDesc}`,
+        req,
+      });
+
       logger.info(`[RepuestosController] Solicitud de repuesto ${repId} anulada.`);
 
       return res.json({

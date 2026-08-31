@@ -9,8 +9,11 @@ import {
   Multimedia,
   Company,
   FlotaOrdenServicioProfit,
+  OrdenAuditLog,
 } from '../models';
 import { EmailService } from '../services/email.service';
+import { SyncService } from '../services/sync.service';
+import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 import { getTenantContext, getAuthorizedPlatesForTenant } from '../utils/tenantHelper';
 
@@ -214,8 +217,25 @@ export class OrdenController {
         syncedToMssql = true;
         logger.info(`[OrdenController] Orden ${nuevaOrden.id} guardada exitosamente en BD Local y en MSSQL (ad_trans.dbo.flota_ordenes_servicio)`);
       } catch (mssqlErr: any) {
-        logger.warn(`[OrdenController] Advertencia al sincronizar orden ${nuevaOrden.id} en MSSQL Profit Plus: ${mssqlErr.message}`);
+        logger.warn(`[OrdenController] Encolando orden ${nuevaOrden.id} para sincronización diferida con MSSQL: ${mssqlErr.message}`);
+        await SyncService.enqueueOperation({
+          entityType: 'ORDEN_SERVICIO',
+          entityId: nuevaOrden.id,
+          operation: 'CREATE',
+          payload: nuevaOrden.toJSON(),
+          companyId: tenant?.companyId,
+        });
       }
+
+      // Registrar en bitácora de auditoría
+      await AuditService.recordLog({
+        ordenId: nuevaOrden.id,
+        action: 'APERTURA_ORDEN',
+        fieldName: 'id',
+        newValue: nuevaOrden.id,
+        description: `Apertura formal de la Orden de Servicio ${nuevaOrden.id} para la unidad ${nuevaOrden.placa} (${unidad.empresa}). Km: ${km}, Recibido por: ${recibidoPor}, Entregado por: ${entregadoPor || 'No indicado'}.${nuevaOrden.esReincidencia ? ` [Reincidencia de ${nuevaOrden.osAnterior}]` : ''}`,
+        req,
+      });
 
       // Disparar notificación por correo
       EmailService.notifyOrdenApertura(
@@ -414,9 +434,24 @@ export class OrdenController {
           profitOrden.hora_cierre = new Date();
           await profitOrden.save();
           logger.info(`[OrdenController] Cierre de orden ${orden.id} sincronizado en MSSQL AD_TRANS`);
+        } else {
+          await SyncService.enqueueOperation({
+            entityType: 'ORDEN_SERVICIO',
+            entityId: orden.id,
+            operation: 'UPDATE',
+            payload: orden.toJSON(),
+            companyId: tenant?.companyId,
+          });
         }
       } catch (mssqlCloseErr: any) {
-        logger.warn(`[OrdenController] No se pudo actualizar cierre en MSSQL: ${mssqlCloseErr.message}`);
+        logger.warn(`[OrdenController] Encolando cierre de orden ${orden.id} para sincronización diferida con MSSQL: ${mssqlCloseErr.message}`);
+        await SyncService.enqueueOperation({
+          entityType: 'ORDEN_SERVICIO',
+          entityId: orden.id,
+          operation: 'UPDATE',
+          payload: orden.toJSON(),
+          companyId: tenant?.companyId,
+        });
       }
 
       // Si la unidad tuvo reparación mayor, actualizar historial para futuras reincidencias
@@ -427,6 +462,17 @@ export class OrdenController {
         await unidad.save();
       }
 
+      // Registrar auditoría de cierre formal
+      await AuditService.recordLog({
+        ordenId: orden.id,
+        action: 'CIERRE_ORDEN',
+        fieldName: 'estado',
+        previousValue: 'En Proceso',
+        newValue: 'Cerrada',
+        description: `Cierre formal y liquidación de Orden ${orden.id}. Monto Total: $${totales.totalGeneral} (Repuestos: $${totales.totalRepuestos}, MO: $${totales.totalManoObra}, Externos: $${totales.totalExternos}). Recibe Conforme: ${recibeConforme || 'Conforme'}. Fecha Entrega: ${orden.fechaEntrega?.toISOString() || new Date().toISOString()}`,
+        req,
+      });
+
       logger.info(`[OrdenController] Orden de servicio ${orden.id} cerrada satisfactoriamente con liquidación total: $${totales.totalGeneral}`);
 
       return res.json({
@@ -434,6 +480,181 @@ export class OrdenController {
         message: 'Orden de servicio cerrada exitosamente. Liquidación emitida y conciliada con el ERP.',
         data: orden,
         liquidacion: totales,
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Actualiza datos generales de una Orden de Servicio existente y registra auditoría por cada campo modificado.
+   */
+  static async updateOrden(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { km, sintomas, recibidoPor, entregadoPor, motivoReincidencia } = req.body;
+
+      const orden = await OrdenServicio.findByPk(id);
+      if (!orden) {
+        return res.status(404).json({ success: false, error: 'Orden de servicio no encontrada.' });
+      }
+
+      const tenant = await getTenantContext(req);
+      if (tenant && orden.tenantId && orden.tenantId !== tenant.companyId) {
+        return res.status(403).json({
+          success: false,
+          error: `Acceso denegado: No puede modificar la orden ${id} desde otra empresa.`,
+          code: 'TENANT_ISOLATION_VIOLATION',
+        });
+      }
+
+      if (orden.estado === 'Cerrada') {
+        return res.status(400).json({
+          success: false,
+          error: 'No se pueden modificar datos de una orden de servicio que ya ha sido cerrada.',
+        });
+      }
+
+      const labelMap: Record<string, string> = {
+        km: 'Kilometraje / Horómetro',
+        sintomas: 'Síntomas Reportados',
+        recibidoPor: 'Recibido por (Mecánico)',
+        entregadoPor: 'Entregado por (Conductor)',
+        motivoReincidencia: 'Motivo de Reincidencia',
+      };
+
+      const fieldsToCheck: Array<'km' | 'sintomas' | 'recibidoPor' | 'entregadoPor' | 'motivoReincidencia'> = [
+        'km',
+        'sintomas',
+        'recibidoPor',
+        'entregadoPor',
+        'motivoReincidencia',
+      ];
+
+      for (const field of fieldsToCheck) {
+        if (req.body[field] !== undefined) {
+          const oldVal = (orden as any)[field];
+          const newVal = req.body[field];
+
+          // Si hay cambio real
+          if (String(oldVal || '') !== String(newVal || '')) {
+            (orden as any)[field] = newVal;
+            await AuditService.recordLog({
+              ordenId: orden.id,
+              action: 'MODIFICACION_CAMPO',
+              fieldName: field,
+              previousValue: oldVal,
+              newValue: newVal,
+              description: `Actualización de "${labelMap[field]}": anterior "${oldVal || '(vacío)'}" → nuevo "${newVal || '(vacío)'}"`,
+              req,
+            });
+          }
+        }
+      }
+
+      await orden.save();
+
+      return res.json({
+        success: true,
+        message: 'Orden de servicio actualizada exitosamente.',
+        data: orden,
+      });
+    } catch (error: any) {
+      logger.error(`[OrdenController] Error actualizando orden: ${error.message}`);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Obtiene la bitácora completa de auditoría para una orden de servicio con filtros opcionales.
+   */
+  static async getAuditoriaByOrdenId(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { action, otId, fieldName, userRole, search } = req.query;
+
+      const orden = await OrdenServicio.findByPk(id);
+      if (!orden) {
+        return res.status(404).json({ success: false, error: 'Orden de servicio no encontrada.' });
+      }
+
+      const where: any = { ordenId: id };
+
+      if (action) where.action = action;
+      if (otId) where.otId = otId;
+      if (fieldName) where.fieldName = fieldName;
+      if (userRole) where.userRole = userRole;
+
+      if (search) {
+        const s = `%${search}%`;
+        where[Op.or] = [
+          { description: { [Op.like]: s } },
+          { userName: { [Op.like]: s } },
+          { userEmail: { [Op.like]: s } },
+          { fieldName: { [Op.like]: s } },
+          { action: { [Op.like]: s } },
+        ];
+      }
+
+      const logs = await OrdenAuditLog.findAll({
+        where,
+        order: [['createdAt', 'DESC']],
+      });
+
+      // Estadísticas de auditoría
+      const stats = {
+        totalRegistros: logs.length,
+        usuariosInvolucrados: Array.from(new Set(logs.map(l => l.userName))),
+        acciones: logs.reduce((acc: Record<string, number>, curr) => {
+          acc[curr.action] = (acc[curr.action] || 0) + 1;
+          return acc;
+        }, {}),
+      };
+
+      return res.json({
+        success: true,
+        ordenId: id,
+        count: logs.length,
+        stats,
+        data: logs,
+      });
+    } catch (error: any) {
+      logger.error(`[OrdenController] Error obteniendo auditoría de orden: ${error.message}`);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Agrega una nota técnica u observación manual al historial de auditoría de la orden.
+   */
+  static async addManualAuditNote(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { nota, otId, categoria } = req.body;
+
+      if (!nota || !nota.trim()) {
+        return res.status(400).json({ success: false, error: 'Debe ingresar el contenido de la observación o nota técnica.' });
+      }
+
+      const orden = await OrdenServicio.findByPk(id);
+      if (!orden) {
+        return res.status(404).json({ success: false, error: 'Orden de servicio no encontrada.' });
+      }
+
+      const auditRecord = await AuditService.recordLog({
+        ordenId: id,
+        otId: otId || null,
+        action: 'OBSERVACION_TECNICA',
+        fieldName: categoria || 'nota_auditoria',
+        newValue: nota.trim(),
+        description: `Nota Técnica / Observación: ${nota.trim()}`,
+        req,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Nota u observación registrada en el historial de auditoría.',
+        data: auditRecord,
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, error: error.message });

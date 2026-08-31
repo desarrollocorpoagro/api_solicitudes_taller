@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { OrdenArea, OrdenServicio, SolicitudRepuesto, SolicitudExterno } from '../models';
 import { TARIFAS_AREA } from '../models/OrdenArea.model';
+import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 
 export class OrdenAreaController {
@@ -44,6 +45,17 @@ export class OrdenAreaController {
         await orden.save();
       }
 
+      // Registrar auditoría
+      await AuditService.recordLog({
+        ordenId,
+        otId,
+        action: 'CREACION_OT',
+        fieldName: 'area',
+        newValue: area,
+        description: `Apertura de orden de área técnica ${otId} (${area}) asignada a mecánico: "${mecanico}". Horas estimadas: ${horasNum}h ($${costoManoObra}). Diagnóstico inicial: "${diagnostico || '(pendiente)'}"`,
+        req,
+      });
+
       logger.info(`[OrdenAreaController] Orden de área ${otId} (${area}) creada para ${ordenId}`);
       return res.status(201).json({
         success: true,
@@ -61,19 +73,64 @@ export class OrdenAreaController {
   static async updateArea(req: Request, res: Response) {
     try {
       const { id: ordenId, otId } = req.params;
-      const { diagnostico, horas, estado } = req.body;
+      const { diagnostico, horas, estado, mecanico } = req.body;
 
       const area = await OrdenArea.findOne({ where: { id: otId, ordenId } });
       if (!area) return res.status(404).json({ success: false, error: 'Orden de área no encontrada.' });
 
-      if (diagnostico !== undefined) area.diagnostico = diagnostico;
-      if (horas !== undefined) {
-        area.horas = parseFloat(horas);
-        const tarifa = TARIFAS_AREA[area.area] || area.tarifaHora || 12;
-        area.costoManoObra = parseFloat((area.horas * tarifa).toFixed(2));
+      const oldDiagnostico = area.diagnostico;
+      const oldHoras = area.horas;
+      const oldMecanico = area.mecanico;
+      const oldEstado = area.estado;
+
+      if (mecanico !== undefined && mecanico !== area.mecanico) {
+        area.mecanico = mecanico;
+        await AuditService.recordLog({
+          ordenId,
+          otId,
+          action: 'ACTUALIZACION_OT',
+          fieldName: 'mecanico',
+          previousValue: oldMecanico,
+          newValue: mecanico,
+          description: `Mecánico responsable de ${otId} modificado de "${oldMecanico}" a "${mecanico}"`,
+          req,
+        });
       }
 
-      if (estado) {
+      if (diagnostico !== undefined && diagnostico !== area.diagnostico) {
+        area.diagnostico = diagnostico;
+        await AuditService.recordLog({
+          ordenId,
+          otId,
+          action: 'ACTUALIZACION_OT',
+          fieldName: 'diagnostico',
+          previousValue: oldDiagnostico,
+          newValue: diagnostico,
+          description: `Diagnóstico técnico de ${otId} actualizado: "${diagnostico}"`,
+          req,
+        });
+      }
+
+      if (horas !== undefined && parseFloat(horas) !== area.horas) {
+        const prevHoras = area.horas;
+        area.horas = parseFloat(horas);
+        const tarifa = TARIFAS_AREA[area.area] || area.tarifaHora || 12;
+        const prevMO = area.costoManoObra;
+        area.costoManoObra = parseFloat((area.horas * tarifa).toFixed(2));
+
+        await AuditService.recordLog({
+          ordenId,
+          otId,
+          action: 'ACTUALIZACION_OT',
+          fieldName: 'horas',
+          previousValue: `${prevHoras}h ($${prevMO})`,
+          newValue: `${area.horas}h ($${area.costoManoObra})`,
+          description: `Horas de mano de obra de ${otId} modificadas: ${prevHoras}h ($${prevMO}) → ${area.horas}h ($${area.costoManoObra})`,
+          req,
+        });
+      }
+
+      if (estado && estado !== oldEstado) {
         if (estado === 'cerrada') {
           if (!area.diagnostico || !area.diagnostico.trim()) {
             return res.status(400).json({
@@ -116,6 +173,17 @@ export class OrdenAreaController {
           }
         }
         area.estado = estado;
+
+        await AuditService.recordLog({
+          ordenId,
+          otId,
+          action: estado === 'cerrada' ? 'CIERRE_OT' : 'ACTUALIZACION_OT',
+          fieldName: 'estado',
+          previousValue: oldEstado,
+          newValue: estado,
+          description: `Estado de orden de área ${otId} cambiado de "${oldEstado}" a "${estado}"`,
+          req,
+        });
       }
 
       await area.save();
@@ -138,6 +206,9 @@ export class OrdenAreaController {
     try {
       const { id: ordenId, otId } = req.params;
 
+      const area = await OrdenArea.findOne({ where: { id: otId, ordenId } });
+      if (!area) return res.status(404).json({ success: false, error: 'Orden de área no encontrada.' });
+
       const countReps = await SolicitudRepuesto.count({ where: { ordenId, otId } });
       const countExts = await SolicitudExterno.count({ where: { ordenId, otId } });
 
@@ -148,8 +219,19 @@ export class OrdenAreaController {
         });
       }
 
-      const deleted = await OrdenArea.destroy({ where: { id: otId, ordenId } });
-      if (!deleted) return res.status(404).json({ success: false, error: 'Orden de área no encontrada.' });
+      const areaName = area.area;
+      await area.destroy();
+
+      await AuditService.recordLog({
+        ordenId,
+        otId,
+        action: 'ELIMINACION_OT',
+        fieldName: 'id',
+        previousValue: otId,
+        newValue: null,
+        description: `Anulación y eliminación de orden de área ${otId} (${areaName})`,
+        req,
+      });
 
       return res.json({
         success: true,

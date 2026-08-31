@@ -19,7 +19,12 @@ const router = Router();
 router.post('/', validateJoi(createOrdenServicioSchema), OrdenController.createOrden);
 router.get('/', OrdenController.getAllOrdenes);
 router.get('/:id', OrdenController.getOrdenById);
+router.put('/:id', OrdenController.updateOrden);
 router.post('/:id/cerrar', validateJoi(cerrarOrdenServicioSchema), OrdenController.cerrarOrden);
+
+// 1.1 Bitácora de Auditoría y Trazabilidad Operativa
+router.get('/:id/auditoria', OrdenController.getAuditoriaByOrdenId);
+router.post('/:id/auditoria/nota', OrdenController.addManualAuditNote);
 
 // 2. Órdenes de Área (OT)
 router.post('/:id/areas', validateJoi(createOrdenAreaSchema), OrdenAreaController.createArea);

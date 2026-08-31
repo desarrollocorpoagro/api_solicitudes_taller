@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { SolicitudExterno, OrdenServicio, OrdenArea } from '../models';
 import { EmailService } from '../services/email.service';
+import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 
 export class ExternosController {
@@ -39,6 +40,17 @@ export class ExternosController {
         EmailService.notifyEscalamientoFlota(descripcion, costo, ordenId, otId);
       }
 
+      // Registrar auditoría
+      await AuditService.recordLog({
+        ordenId,
+        otId,
+        action: 'SOLICITUD_EXTERNO',
+        fieldName: 'servicio_externo',
+        newValue: `${descripcion} (${proveedor})`,
+        description: `Solicitud de servicio externo: "${descripcion}" con proveedor "${proveedor}". Costo: $${costo}${isGarantia ? ` [Garantía de OS ${ordenOrigenGarantia}]` : ''}`,
+        req,
+      });
+
       logger.info(`[ExternosController] Solicitud de servicio externo creada: ${descripcion} (${proveedor}) para ${ordenId}`);
 
       return res.status(201).json({
@@ -61,7 +73,21 @@ export class ExternosController {
       const solicitud = await SolicitudExterno.findOne({ where: { id: extId, ordenId } });
       if (!solicitud) return res.status(404).json({ success: false, error: 'Solicitud externa no encontrada.' });
 
+      const extDesc = `${solicitud.descripcion} (${solicitud.proveedor})`;
+      const otId = solicitud.otId;
       await solicitud.destroy();
+
+      await AuditService.recordLog({
+        ordenId,
+        otId,
+        action: 'ANULACION_EXTERNO',
+        fieldName: 'servicio_externo',
+        previousValue: extDesc,
+        newValue: null,
+        description: `Anulación de solicitud de servicio externo: ${extDesc}`,
+        req,
+      });
+
       logger.info(`[ExternosController] Solicitud de servicio externo ${extId} anulada.`);
 
       return res.json({

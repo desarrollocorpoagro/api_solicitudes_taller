@@ -10,6 +10,7 @@ import SolicitudRepuesto from './SolicitudRepuesto.model';
 import SolicitudExterno from './SolicitudExterno.model';
 import Notificacion from './Notificacion.model';
 import Multimedia from './Multimedia.model';
+import OrdenAuditLog from './OrdenAuditLog.model';
 import FlotaOrdenServicioProfit from './FlotaOrdenServicioProfit.model';
 import VwFlotaVendedores from './VwFlotaVendedores.model';
 import VwFlotaArticulos from './VwFlotaArticulos.model';
@@ -17,6 +18,7 @@ import MecanicosProfit from './MecanicosProfit.model';
 import DatabaseConnection from './DatabaseConnection.model';
 import RolePermission from './RolePermission.model';
 import UserPermission from './UserPermission.model';
+import SyncQueue, { initSyncQueueModel } from './SyncQueue.model';
 import { profitSequelize, initProfitDatabase, getProfitConnectionStatus } from '../config/profitDb';
 import { logger } from '../utils/logger';
 
@@ -42,6 +44,9 @@ SolicitudExterno.belongsTo(OrdenServicio, { foreignKey: 'ordenId', as: 'orden' }
 OrdenServicio.hasMany(Multimedia, { foreignKey: 'ordenId', as: 'archivosMultimedia', onDelete: 'SET NULL' });
 Multimedia.belongsTo(OrdenServicio, { foreignKey: 'ordenId', as: 'orden' });
 
+OrdenServicio.hasMany(OrdenAuditLog, { foreignKey: 'ordenId', as: 'auditorias', onDelete: 'CASCADE' });
+OrdenAuditLog.belongsTo(OrdenServicio, { foreignKey: 'ordenId', as: 'orden' });
+
 export {
   sequelize,
   profitSequelize,
@@ -58,6 +63,7 @@ export {
   SolicitudExterno,
   Notificacion,
   Multimedia,
+  OrdenAuditLog,
   FlotaOrdenServicioProfit,
   VwFlotaVendedores,
   VwFlotaArticulos,
@@ -65,6 +71,8 @@ export {
   DatabaseConnection,
   RolePermission,
   UserPermission,
+  SyncQueue,
+  initSyncQueueModel,
 };
 
 /**
@@ -112,9 +120,16 @@ export const seedInitialData = async () => {
     }
 
     // 2. Semilla de Usuarios y asignaciones de empresa
-    const userCount = await User.count();
-    if (userCount === 0) {
-      const admin = await User.create({
+    const allPermissions = [
+      { module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'close', 'admin'] },
+      { module: 'fleet', actions: ['read', 'create', 'update', 'delete', 'admin'] },
+      { module: 'inventory', actions: ['read', 'dispatch', 'requisition', 'admin'] },
+      { module: 'users', actions: ['read', 'create', 'update', 'delete', 'admin'] },
+      { module: 'reports', actions: ['read', 'export', 'admin'] },
+    ];
+
+    const usersToSeed = [
+      {
         id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         fullName: 'Administrador San Luis',
         email: 'admin@empresasanluis.com',
@@ -122,9 +137,10 @@ export const seedInitialData = async () => {
         phone: '+58 412 1112233',
         role: 'ADMIN',
         isActive: true,
-      });
-
-      const gerente = await User.create({
+        companies: [comp1?.id, comp2?.id, comp3?.id],
+        permissions: allPermissions,
+      },
+      {
         id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
         fullName: 'Ing. Carlos Mendoza (Gerente Taller)',
         email: 'gerente.taller@empresasanluis.com',
@@ -132,9 +148,25 @@ export const seedInitialData = async () => {
         phone: '+58 414 2223344',
         role: 'GERENTE_TALLER',
         isActive: true,
-      });
-
-      const flota = await User.create({
+        companies: [comp1?.id, comp2?.id],
+        permissions: allPermissions,
+      },
+      {
+        id: '12121212-1212-1212-1212-121212121212',
+        fullName: 'Téc. Marcos Peña (Supervisor Taller)',
+        email: 'supervisor.taller@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 414 7778899',
+        role: 'SUPERVISOR',
+        isActive: true,
+        companies: [comp1?.id, comp2?.id],
+        permissions: [
+          { module: 'taller', actions: ['read', 'create', 'update', 'approve'] },
+          { module: 'fleet', actions: ['read', 'update'] },
+          { module: 'inventory', actions: ['read', 'create'] },
+        ],
+      },
+      {
         id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
         fullName: 'Lic. Mariana Rojas (Responsable Flota)',
         email: 'flota@empresasanluis.com',
@@ -142,9 +174,14 @@ export const seedInitialData = async () => {
         phone: '+58 416 3334455',
         role: 'RESPONSABLE_FLOTA',
         isActive: true,
-      });
-
-      const mecanico = await User.create({
+        companies: [comp1?.id, comp2?.id, comp3?.id],
+        permissions: [
+          { module: 'fleet', actions: ['read', 'create', 'update'] },
+          { module: 'taller', actions: ['read', 'create'] },
+          { module: 'reports', actions: ['read'] },
+        ],
+      },
+      {
         id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
         fullName: 'José Ramírez (Técnico Mecánico)',
         email: 'jose.ramirez@empresasanluis.com',
@@ -152,39 +189,121 @@ export const seedInitialData = async () => {
         phone: '+58 424 4445566',
         role: 'MECANICO',
         isActive: true,
-      });
-
-      const almacen = await User.create({
+        companies: [comp1?.id],
+        permissions: [
+          { module: 'taller', actions: ['read', 'update'] },
+          { module: 'inventory', actions: ['read', 'create'] },
+        ],
+      },
+      {
+        id: '34343434-3434-3434-3434-343434343434',
+        fullName: 'Denny Castillo (Mecánico 1 / Taller)',
+        email: 'mecanico@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 412 8889900',
+        role: 'MECANICO',
+        isActive: true,
+        companies: [comp1?.id, comp2?.id],
+        permissions: [
+          { module: 'taller', actions: ['read', 'update'] },
+          { module: 'inventory', actions: ['read', 'create'] },
+        ],
+      },
+      {
         id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-        fullName: 'Pedro Morales (Almacén TLL-01)',
+        fullName: 'Pedro Morales (Almacén Central TLL-01)',
         email: 'almacen@empresasanluis.com',
         password: 'Password123!',
         phone: '+58 412 5556677',
         role: 'ALMACENISTA',
         isActive: true,
-      });
+        companies: [comp1?.id, comp2?.id, comp3?.id],
+        permissions: [
+          { module: 'inventory', actions: ['read', 'dispatch', 'requisition'] },
+          { module: 'taller', actions: ['read'] },
+          { module: 'reports', actions: ['read'] },
+        ],
+      },
+      {
+        id: '56565656-5656-5656-5656-565656565656',
+        fullName: 'Lic. Francisco Rivas (Auditor de Calidad)',
+        email: 'auditor@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 414 9991122',
+        role: 'AUDITOR',
+        isActive: true,
+        companies: [comp1?.id, comp2?.id, comp3?.id],
+        permissions: [
+          { module: 'taller', actions: ['read'] },
+          { module: 'fleet', actions: ['read'] },
+          { module: 'inventory', actions: ['read'] },
+          { module: 'reports', actions: ['read', 'export'] },
+        ],
+      },
+      {
+        id: '78787878-7878-7878-7878-787878787878',
+        fullName: 'Ing. Roberto Gómez (Solicitante Operaciones)',
+        email: 'solicitante@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 416 2223344',
+        role: 'SOLICITANTE',
+        isActive: true,
+        companies: [comp1?.id, comp2?.id],
+        permissions: [
+          { module: 'taller', actions: ['read', 'create'] },
+          { module: 'fleet', actions: ['read'] },
+        ],
+      },
+      {
+        id: '90909090-9090-9090-9090-909090909090',
+        fullName: 'Luis Márquez (Operador / Conductor)',
+        email: 'operador@empresasanluis.com',
+        password: 'Password123!',
+        phone: '+58 424 5556677',
+        role: 'OPERADOR',
+        isActive: true,
+        companies: [comp1?.id, comp2?.id, comp3?.id],
+        permissions: [
+          { module: 'taller', actions: ['read'] },
+          { module: 'fleet', actions: ['read'] },
+        ],
+      },
+    ];
 
-      // Asignar usuarios a empresas con permisos
-      const allPermissions = [
-        { module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'close'] },
-        { module: 'fleet', actions: ['read', 'create', 'update'] },
-        { module: 'inventory', actions: ['read', 'dispatch', 'requisition'] },
-        { module: 'users', actions: ['read', 'create', 'update', 'delete'] },
-        { module: 'reports', actions: ['read', 'export'] },
-      ];
+    for (const u of usersToSeed) {
+      const existing = await User.findOne({ where: { email: u.email } });
+      let userRecord = existing;
+      if (!existing) {
+        userRecord = await User.create({
+          id: u.id,
+          fullName: u.fullName,
+          email: u.email,
+          password: u.password,
+          phone: u.phone,
+          role: u.role,
+          isActive: u.isActive,
+        });
+      }
 
-      await UserCompany.bulkCreate([
-        { userId: admin.id, companyId: comp1.id, role: 'ADMIN', permissions: allPermissions },
-        { userId: admin.id, companyId: comp2.id, role: 'ADMIN', permissions: allPermissions },
-        { userId: admin.id, companyId: comp3.id, role: 'ADMIN', permissions: allPermissions },
-        { userId: gerente.id, companyId: comp1.id, role: 'GERENTE_TALLER', permissions: allPermissions },
-        { userId: flota.id, companyId: comp1.id, role: 'RESPONSABLE_FLOTA', permissions: allPermissions },
-        { userId: mecanico.id, companyId: comp1.id, role: 'MECANICO', permissions: [{ module: 'taller', actions: ['read', 'update'] }] },
-        { userId: almacen.id, companyId: comp1.id, role: 'ALMACENISTA', permissions: [{ module: 'inventory', actions: ['read', 'dispatch'] }] },
-      ]);
-
-      logger.info('[Seed] Usuarios y asignaciones creados exitosamente.');
+      if (userRecord && u.companies) {
+        for (const cId of u.companies) {
+          if (!cId) continue;
+          const userComp = await UserCompany.findOne({
+            where: { userId: userRecord.id, companyId: cId },
+          });
+          if (!userComp) {
+            await UserCompany.create({
+              userId: userRecord.id,
+              companyId: cId,
+              role: u.role,
+              permissions: u.permissions,
+            });
+          }
+        }
+      }
     }
+
+    logger.info('[Seed] Usuarios y asignaciones de todos los roles (9 roles) verificados exitosamente.');
 
     // 3. Semilla de Flota Vehicular Multi-Tenant
     const flotaCount = await FlotaVehicular.count();
@@ -480,7 +599,42 @@ export const seedInitialData = async () => {
         estadoAprobacion: 'Pendiente',
       });
 
-      logger.info('[Seed] Órdenes de Servicio inicializadas para todas las empresas.');
+      // Semilla inicial de Auditoría y Trazabilidad para OS-2026-00101
+      await OrdenAuditLog.bulkCreate([
+        {
+          ordenId: demoOrder1.id,
+          userName: 'Ing. Carlos Mendoza',
+          userEmail: 'carlos.mendoza@empresasanluis.com',
+          userRole: 'ADMIN',
+          action: 'APERTURA_ORDEN',
+          description: `Apertura inicial de Orden de Servicio ${demoOrder1.id} para la unidad A12BC3D (Mack Granite 2021) con 184,320 km.`,
+          ipAddress: '192.168.1.45',
+        },
+        {
+          ordenId: demoOrder1.id,
+          otId: demoArea1.id,
+          userName: 'José Ramírez',
+          userEmail: 'mecanico@empresasanluis.com',
+          userRole: 'MECANICO',
+          action: 'CREACION_OT',
+          description: `Apertura de Sub-Orden de Área ${demoArea1.id} (Reparaciones mayores) asignada a José Ramírez con 2 horas estimadas.`,
+          ipAddress: '192.168.1.102',
+        },
+        {
+          ordenId: demoOrder1.id,
+          otId: demoArea1.id,
+          userName: 'José Ramírez',
+          userEmail: 'mecanico@empresasanluis.com',
+          userRole: 'MECANICO',
+          action: 'SOLICITUD_REPUESTO',
+          fieldName: 'FRE-0234',
+          newValue: '1 unidad ($82.00)',
+          description: `Solicitud de 1 unidad del repuesto FRE-0234 (Disco de freno delantero) por alabeo excesivo.`,
+          ipAddress: '192.168.1.102',
+        },
+      ]);
+
+      logger.info('[Seed] Órdenes de Servicio y Bitácoras de Auditoría inicializadas para todas las empresas.');
     }
 
     // 8. Semilla de Conexión de Base de Datos MSSQL Profit Plus (AD_TRANS)

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { SolicitudRepuesto, CatalogoRepuesto, OrdenServicio } from '../models';
 import { ErpService } from '../services/erp.service';
+import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 import { getTenantContext, getAuthorizedPlatesForTenant } from '../utils/tenantHelper';
 
@@ -92,6 +93,18 @@ export class AlmacenController {
       solicitud.despachadoPor = despachadoPor;
       solicitud.fechaDespacho = new Date();
       await solicitud.save();
+
+      // Registrar auditoría de entrega física en almacén
+      await AuditService.recordLog({
+        ordenId: solicitud.ordenId,
+        otId: solicitud.otId,
+        action: 'DESPACHO_REPUESTO',
+        fieldName: 'estadoEntrega',
+        previousValue: 'Por entregar',
+        newValue: 'Entregado',
+        description: `Despacho de almacén: Entrega física de ${solicitud.cod} ("${solicitud.desc}") × ${solicitud.cant} unid. Conciliación ERP: Movimiento #${numMovimiento}. Despachador: ${despachadoPor}`,
+        req,
+      });
 
       logger.info(`[AlmacenController] Despacho confirmado para repuesto ${solicitud.cod} (Movimiento: ${numMovimiento})`);
 

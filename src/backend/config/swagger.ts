@@ -341,6 +341,69 @@ Documentación oficial de los endpoints de la API del Grupo San Luis desarrollad
           200: { description: 'Detalle de orden, liquidación y chequeo de validaciones' },
         },
       },
+      put: {
+        tags: ['Órdenes de Servicio (Taller)'],
+        summary: 'Actualizar parámetros de la orden con registro de auditoría de cambios',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', example: 'OS-2026-00101' } }],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  km: { type: 'integer', example: 184500 },
+                  sintomas: { type: 'string', example: 'Actualización de síntomas técnicos reportados' },
+                  recibidoPor: { type: 'string', example: 'MEC-002' },
+                  entregadoPor: { type: 'string', example: 'VEND-001' },
+                  motivoReincidencia: { type: 'string', example: 'Revisión por garantía' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Orden actualizada y cambios registrados en la bitácora de auditoría' },
+        },
+      },
+    },
+    '/ordenes/{id}/auditoria': {
+      get: {
+        tags: ['Historial de Auditoría & Trazabilidad'],
+        summary: 'Consultar historial de auditoría y trazabilidad de cambios por usuario, fecha y campo',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', example: 'OS-2026-00101' } }],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: 'Lista cronológica de eventos de auditoría registrados para la orden' },
+        },
+      },
+    },
+    '/ordenes/{id}/auditoria/nota': {
+      post: {
+        tags: ['Historial de Auditoría & Trazabilidad'],
+        summary: 'Registrar una nota u observación técnica manual en la bitácora de auditoría',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', example: 'OS-2026-00101' } }],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['nota'],
+                properties: {
+                  nota: { type: 'string', example: 'Inspección de frenos superada satisfactoriamente en banco.' },
+                  otId: { type: 'string', example: 'OT-A1' },
+                  categoria: { type: 'string', example: 'Inspección de Calidad' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: { description: 'Nota técnica registrada en la bitácora de auditoría' },
+        },
+      },
     },
     '/ordenes/{id}/cerrar': {
       post: {

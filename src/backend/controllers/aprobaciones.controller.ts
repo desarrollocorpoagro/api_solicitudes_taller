@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { SolicitudRepuesto, SolicitudExterno, CatalogoRepuesto, OrdenServicio } from '../models';
 import { ErpService } from '../services/erp.service';
+import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 import { getTenantContext, getAuthorizedPlatesForTenant } from '../utils/tenantHelper';
 
@@ -123,6 +124,19 @@ export class AprobacionesController {
         }
 
         await solicitud.save();
+
+        // Registrar auditoría de aprobación / rechazo
+        await AuditService.recordLog({
+          ordenId: solicitud.ordenId,
+          otId: solicitud.otId,
+          action: accion === 'APROBAR' ? 'APROBACION_REPUESTO' : 'RECHAZO_REPUESTO',
+          fieldName: 'estadoAprobacion',
+          previousValue: 'Pendiente',
+          newValue: solicitud.estadoAprobacion,
+          description: `${accion === 'APROBAR' ? 'Aprobación' : 'Rechazo'} de solicitud de repuesto: ${solicitud.cod} ("${solicitud.desc}") x ${solicitud.cant} ($${solicitud.costoTotal}). Estado entrega: ${solicitud.estadoEntrega}${solicitud.numRequisicionERP ? ` [Req ERP: ${solicitud.numRequisicionERP}]` : ''}`,
+          req,
+        });
+
         logger.info(`[AprobacionesController] Solicitud de repuesto ${id} ${solicitud.estadoAprobacion}`);
 
         return res.json({
@@ -139,6 +153,19 @@ export class AprobacionesController {
         solicitud.fechaAprobacion = new Date();
 
         await solicitud.save();
+
+        // Registrar auditoría de aprobación / rechazo
+        await AuditService.recordLog({
+          ordenId: solicitud.ordenId,
+          otId: solicitud.otId,
+          action: accion === 'APROBAR' ? 'APROBACION_EXTERNO' : 'RECHAZO_EXTERNO',
+          fieldName: 'estadoAprobacion',
+          previousValue: 'Pendiente',
+          newValue: solicitud.estadoAprobacion,
+          description: `${accion === 'APROBAR' ? 'Aprobación' : 'Rechazo'} de servicio externo: ${solicitud.descripcion} (${solicitud.proveedor}). Costo: $${solicitud.costoEfectivo}${solicitud.conGarantia ? ' [Cubierto por garantía]' : ''}`,
+          req,
+        });
+
         logger.info(`[AprobacionesController] Solicitud externa ${id} ${solicitud.estadoAprobacion}`);
 
         return res.json({

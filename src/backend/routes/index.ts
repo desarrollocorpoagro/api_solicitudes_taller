@@ -13,6 +13,7 @@ import aiAgentRoutes from './aiAgent.routes';
 import profitFlotaRoutes from './profitFlota.routes';
 import dbConnectionRoutes from './dbConnection.routes';
 import rolePermissionRoutes from './rolePermission.routes';
+import syncRoutes from './sync.routes';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/ai', aiAgentRoutes);
 router.use('/profit', profitFlotaRoutes);
 router.use('/db-connections', dbConnectionRoutes);
 router.use('/roles-permissions', rolePermissionRoutes);
+router.use('/sync', syncRoutes);
 
 export default router;

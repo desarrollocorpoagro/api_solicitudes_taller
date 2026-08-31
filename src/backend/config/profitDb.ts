@@ -250,20 +250,34 @@ async function seedProfitFallbackTables(seq: Sequelize): Promise<void> {
       logger.info(`[Profit SQLite Fallback] Artículos de prueba sembrados en vw_flota_articulos`);
     }
 
-    // Sembrar Mecánicos si está vacía
-    const [mecanicos]: any = await seq.query(`SELECT COUNT(*) as count FROM mecanicos`);
-    if (mecanicos[0]?.count === 0) {
+    // Sembrar Mecánicos con los 19 registros oficiales
+    const [mecanicosCount]: any = await seq.query(`SELECT COUNT(*) as count FROM mecanicos`);
+    const [hasNewData]: any = await seq.query(`SELECT COUNT(*) as count FROM mecanicos WHERE codigo LIKE 'V%'`);
+    if (mecanicosCount[0]?.count === 0 || hasNewData[0]?.count === 0) {
+      await seq.query(`DELETE FROM mecanicos;`);
       await seq.query(`
         INSERT INTO mecanicos (codigo, nombre, cargo, activo) VALUES
-        ('MEC-001', 'José Gregorio Hernández Ramírez', 'Mecánico Diésel Master / Especialista Motor', 1),
-        ('MEC-002', 'Marcos Antonio Peña Albarrán', 'Técnico Especialista en Frenos y Neumática', 1),
-        ('MEC-003', 'Luis Eduardo Quintero Mendoza', 'Electricista Automotriz y Diagnóstico Electrónico', 1),
-        ('MEC-004', 'Alexander José Colmenares Gil', 'Técnico de Suspensión, Dirección y Tren Delantero', 1),
-        ('MEC-005', 'Franklin Daniel Morales Soto', 'Mecánico Ajustador de Transmisión y Cajas', 1),
-        ('MEC-006', 'Víctor Hugo Velazco Parra', 'Ayudante de Taller y Mantenimiento Rápido', 1),
-        ('MEC-007', 'Roberto Carlos Díaz Blanco', 'Tornero / Mecánico de Reconstrucción', 0);
+        ('V11587399', 'Denny Antonio Castillo Perdomo', 'Mecanico 1', 1),
+        ('V11588384', 'Deibis Rafael Flores Colmenarez', 'Mecanico Electricista', 1),
+        ('V12884596', 'Jose Luis Garcia Guedez', 'Mecanico 1', 1),
+        ('V13071107', 'Isidro Gregorio Peraza', 'Mecanico 3', 1),
+        ('V15306226', 'Nixon David Silva', 'Mecanico 3', 1),
+        ('V16138289', 'Oscar Jose Colmenarez Medina', 'Mecanico 3', 1),
+        ('V16840342', 'Pedro Catalino Querales Cordero', 'Mecanico 3', 1),
+        ('V17872264', 'Jose Pastor Jimenez Perez', 'Mecanico 2', 1),
+        ('V18699774', 'Armando José Hernández Reyes', 'Mecanico 1', 1),
+        ('V18996330', 'Luis Eduardo Gonzalez Goyo', 'Mecanico 3', 1),
+        ('V19164308', 'Gesus Alexis Gimenez Rodriguez', 'Mecanico 2', 1),
+        ('V20668043', 'Leihender Josue Romero Gutierrez', 'Mecanico 2', 1),
+        ('V20927555', 'Roberth Alexander Timaure Marchan', 'Mecanico 1', 1),
+        ('V22189396', 'Alexander Antonio Perez Palacios', 'Mecanico 3', 1),
+        ('V22268678', 'Eduith Vladimir Bonilla Mendez', 'Mecanico 2', 1),
+        ('V24201409', 'Enderson Jose Nuñes Perez', 'Mecanico 3', 1),
+        ('V26005758', 'Nerio Coromoto Matute Alarcon', 'Mecanico 3', 1),
+        ('V27736322', 'Jose Gregorio Suarez Mendoza', 'Mecanico 2', 1),
+        ('V9116556', 'Luis Fernando Cabrera', 'Mecanico Electricista', 1);
       `);
-      logger.info(`[Profit SQLite Fallback] Mecánicos de prueba sembrados en ad_trans.dbo.mecanicos`);
+      logger.info(`[Profit SQLite Fallback] 19 mecánicos oficiales sembrados en ad_trans.dbo.mecanicos`);
     }
   } catch (err: any) {
     logger.warn(`[Profit SQLite Fallback] Error sembrando tablas de respaldo: ${err.message}`);
