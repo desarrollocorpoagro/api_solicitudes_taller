@@ -80,12 +80,48 @@ export {
  */
 export const seedInitialData = async () => {
   try {
-    // Sincronizar tablas. SQLite puede bloquearse si otra conexión está abierta,
-    // por lo que reintenta de forma defensiva antes de abortar el arranque.
+    const dedupeSqliteRows = async (tableName: string, idColumn = 'id') => {
+      try {
+        const [duplicateRows] = (await sequelize.query(
+          `SELECT ${idColumn} AS idValue, COUNT(*) AS total
+           FROM ${tableName}
+           GROUP BY ${idColumn}
+           HAVING COUNT(*) > 1`
+        )) as unknown as [any[], unknown];
+
+        if (!duplicateRows || duplicateRows.length === 0) return;
+
+        logger.warn(`[Seed] Duplicados detectados en ${tableName}: ${duplicateRows.length} claves repetidas. Se limpiarán antes de continuar.`);
+
+        for (const row of duplicateRows) {
+          const idValue = row.idValue;
+          const safeValue = String(idValue).replace(/'/g, "''");
+
+          await sequelize.query(
+            `DELETE FROM ${tableName}
+             WHERE ${idColumn} = '${safeValue}'
+               AND rowid NOT IN (
+                 SELECT MIN(rowid)
+                 FROM ${tableName}
+                 WHERE ${idColumn} = '${safeValue}'
+               )`
+          );
+        }
+      } catch (error: any) {
+        logger.warn(`[Seed] No se pudo limpiar duplicados de ${tableName}: ${error.message}`);
+      }
+    };
+
+    // Sincronizar tablas sin `alter: true` para evitar la copia de seguridad automática
+    // que SQLite ejecuta al alterar tablas existentes y que puede fallar por restricciones.
+    // Antes de sincronizar también eliminamos filas duplicadas por PK para no romper la integridad.
     const syncWithRetry = async () => {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          await sequelize.sync({ alter: true });
+          await dedupeSqliteRows('role_permissions', 'id');
+          await dedupeSqliteRows('ordenes_servicio', 'id');
+          await dedupeSqliteRows('multimedia', 'id');
+          await sequelize.sync({ alter: false, force: false });
           return;
         } catch (error: any) {
           const isLockError = /database is locked|SQLITE_BUSY|SQLITE_LOCKED/i.test(error?.message || '');

@@ -314,10 +314,24 @@ Documentación técnica y descriptiva de los endpoints disponibles en la API del
 
 ## 16. Conexión Adicional MSSQL Profit Plus (`AD_TRANS`)
 
-Conexión dedicada a la base de datos **`AD_TRANS`** en el servidor MSSQL **`SRVBDPROFITBK`** (usuario `fvelazco`, pass `123`) para operaciones directas en la tabla **`dbo.flota_ordenes_servicio`**.
+Conexión dedicada a la base de datos **`AD_TRANS`** en el servidor MSSQL **`SRVBDPROFITBK`**. La aplicación soporta dos modos:
+
+- Modo real: usa MSSQL remoto para sincronización directa.
+- Modo local: usa SQLite local con espejo de datos para evitar interrupciones del desarrollo.
 
 ### `GET /api/v1/profit/conexion/status`
-- **Descripción**: Diagnostica y reporta el estado de conectividad con el servidor `SRVBDPROFITBK` y la base de datos `AD_TRANS`, incluyendo tiempo de respuesta (latencia en ms) y dialecto activo.
+- **Descripción**: Diagnostica el estado real de la conexión con MSSQL y reporta si la app está operando en modo remoto o en fallback local.
+
+### `POST /api/v1/profit/sync/master`
+- **Descripción**: Ejecuta la sincronización maestra bidireccional de entidades maestras entre la base local y Profit.
+- **Entidades soportadas**: mecánicos, vendedores, artículos y flota_ordenes_servicio.
+- **Respuesta**: JSON con métricas por entidad, insertados, actualizados y errores.
+
+### `GET /api/v1/profit/sync/master/status`
+- **Descripción**: Retorna si el motor de sincronización maestra está activo y si ya existe un último reporte disponible.
+
+### `GET /api/v1/profit/sync/master/last-report`
+- **Descripción**: Devuelve el último reporte generado por el motor de sincronización maestra.
 
 ### `GET /api/v1/profit/flota-ordenes/stats`
 - **Descripción**: Obtiene métricas agregadas en tiempo real de `AD_TRANS`: conteo de órdenes abiertas, en proceso, cerradas, reincidencias y sumatoria de costos (repuestos, mano de obra, externos, total).
@@ -331,31 +345,28 @@ Conexión dedicada a la base de datos **`AD_TRANS`** en el servidor MSSQL **`SRV
 
 ### `POST /api/v1/profit/flota-ordenes`
 - **Descripción**: Registra una nueva orden en `dbo.flota_ordenes_servicio`. Valida unicidad de `nro_orden` y calcula automáticamente `costo_total`.
-- **Cuerpo de la Solicitud (JSON)**:
-  ```json
-  {
-    "nro_orden": "OS-2026-00095",
-    "Placa": "A89BC1D",
-    "km_horometro": 145200.50,
-    "recibido_por": "Ing. Carlos Mendoza",
-    "entregado_por": "Luis Márquez (Operador)",
-    "fec_apertura": "2026-08-27T08:00:00Z",
-    "sintomas_reportados": "Revisión general del sistema de frenos y cambio de lubricantes",
-    "es_reincidencia": false,
-    "nro_orden_anterior": null,
-    "motivo_reincidencia": null,
-    "fotos_adjuntas": 2,
-    "estatus": "ABIERTA",
-    "costo_repuestos": 150.00,
-    "costo_mano_obra": 50.00,
-    "costo_servicios_ext": 25.00,
-    "recibe_conforme": null
-  }
-  ```
 
 ### `PUT /api/v1/profit/flota-ordenes/:id`
 - **Descripción**: Actualiza campos de la orden en `dbo.flota_ordenes_servicio`. Si el estatus cambia a `CERRADA`, asigna automáticamente `fec_cierre` y `hora_cierre`.
 
 ### `DELETE /api/v1/profit/flota-ordenes/:id`
 - **Descripción**: Elimina una orden de servicio de `dbo.flota_ordenes_servicio` por `id_orden` o `nro_orden`.
+
+### `GET /api/v1/profit/mecanicos`
+- **Descripción**: Lista mecánicos desde la fuente de Profit AD_TRANS.
+
+### `GET /api/v1/profit/vendedores`
+- **Descripción**: Lista vendedores desde la vista `vw_flota_vendedores`.
+
+### `GET /api/v1/profit/articulos`
+- **Descripción**: Lista artículos y repuestos desde la vista `vw_flota_articulos`.
+
+---
+
+## 17. Observaciones de operación
+
+- El espejo SQLite se crea en la ruta `data/profit_ad_trans.sqlite`.
+- Las tablas del espejo se inicializan antes de la sincronización maestra para evitar errores de tablas inexistentes.
+- Antes de sincronizar, el sistema limpia duplicados por clave primaria en SQLite para evitar fallos de integridad en arranque.
+- El puerto HTTP del backend puede variar si el puerto base está ocupado; el HMR queda fijo para evitar conflictos de WebSocket.
 
