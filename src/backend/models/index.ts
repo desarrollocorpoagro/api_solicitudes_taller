@@ -80,8 +80,23 @@ export {
  */
 export const seedInitialData = async () => {
   try {
-    // Sincronizar tablas
-    await sequelize.sync({ alter: true });
+    // Sincronizar tablas. SQLite puede bloquearse si otra conexión está abierta,
+    // por lo que reintenta de forma defensiva antes de abortar el arranque.
+    const syncWithRetry = async () => {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await sequelize.sync({ alter: true });
+          return;
+        } catch (error: any) {
+          const isLockError = /database is locked|SQLITE_BUSY|SQLITE_LOCKED/i.test(error?.message || '');
+          if (!isLockError || attempt === 3) throw error;
+          logger.warn(`[Seed] SQLite bloqueado durante sync, reintentando (${attempt}/3)...`);
+          await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+        }
+      }
+    };
+
+    await syncWithRetry();
 
     // 1. Semilla de Empresas (Tenants)
     const companyCount = await Company.count();

@@ -1,4 +1,4 @@
-import { Op, fn, col, literal, Sequelize } from 'sequelize';
+import { Op, fn, col, literal, Sequelize, QueryTypes } from 'sequelize';
 import { profitSequelize, profitMirrorSequelize, getProfitConnectionStatus, isMssqlConnectionActive } from '../config/profitDb';
 import { sequelize } from '../config/database';
 import MecanicosProfit from '../models/MecanicosProfit.model';
@@ -118,7 +118,6 @@ export class MasterSyncService {
   } = {}): Promise<Record<string, MasterSyncReport>> {
     if (this.isRunning) {
       logger.warn('[MasterSyncService] Ya existe un ciclo de sincronización maestro en curso.');
-      // Esperar a que culmine
       let waited = 0;
       while (this.isRunning && waited < 5000) {
         await new Promise((r) => setTimeout(r, 100));
@@ -129,14 +128,13 @@ export class MasterSyncService {
 
     this.isRunning = true;
     const startedAt = Date.now();
-    const entities = opts.entities || ['mecanicos', 'vendedores', 'articulos', 'flota_ordenes_servicio'];
+    const entities = opts.entities && opts.entities.length > 0 ? opts.entities : ['mecanicos', 'vendedores', 'articulos'];
 
     const conn = await getProfitConnectionStatus();
-    // Chequeo estricto: MSSQL real, no fallback SQLite
     const remoteReachable = conn.connected && !conn.fallback;
 
     logger.info(
-      `[MasterSyncService] 🔄 Iniciando sincronización bidireccional maestra. MSSQL ${remoteReachable ? '🟢 CONECTADO' : '🔴 NO DISPONIBLE'}. Entidades: ${entities.join(', ')}`
+      `[MasterSyncService] 🔄 Iniciando sincronización bidireccional. MSSQL ${remoteReachable ? '🟢 CONECTADO' : '🔴 NO DISPONIBLE'}. Entidades: ${entities.join(', ')}`
     );
 
     const report: Record<string, MasterSyncReport> = {};
@@ -162,7 +160,7 @@ export class MasterSyncService {
     }
 
     const totalMs = Date.now() - startedAt;
-    logger.info(`[MasterSyncService] ✅ Sincronización maestra completada en ${totalMs}ms.`);
+    logger.info(`[MasterSyncService] ✅ Sincronización completada en ${totalMs}ms.`);
     return report;
   }
 
@@ -193,92 +191,137 @@ export class MasterSyncService {
       durationMs: 0,
     };
 
+    const normalizeText = (value: unknown): string => String(value ?? '').trim();
+    const normalizeBool = (value: unknown): boolean => {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return value === 1;
+      if (typeof value === 'string') return value.toLowerCase() === 'true' || value === '1';
+      return false;
+    };
+    const hasMechanicDifference = (left: any, right: any): boolean => {
+      return (
+        normalizeText(left?.nombre) !== normalizeText(right?.nombre) ||
+        normalizeText(left?.cargo) !== normalizeText(right?.cargo) ||
+        normalizeBool(left?.activo) !== normalizeBool(right?.activo)
+      );
+    };
+
     try {
-      // 1. Contar registros en cada extremo (LOCAL = espejo SQLite, REMOTE = MSSQL)
       const [localCountResult] = (await profitMirrorSequelize.query(`SELECT COUNT(*) AS c FROM mecanicos`)) as any;
       report.localCount = parseInt(localCountResult?.[0]?.c ?? localCountResult?.[0]?.C ?? '0', 10) || 0;
 
-      if (remoteReachable) {
-        const [remoteCountResult] = (await profitSequelize.query(`SELECT COUNT(*) AS c FROM [AD_TRANS].[dbo].[mecanicos] WITH (NOLOCK)`)) as any;
-        report.remoteCount = parseInt(remoteCountResult?.[0]?.c ?? '0', 10) || 0;
+      if (!remoteReachable) {
+        logger.warn('[MasterSyncService:mecanicos] MSSQL no disponible. Solo se contabilizaron registros locales.');
+        report.durationMs = Date.now() - start;
+        return report;
       }
 
-      // 2. Obtener registros del espejo SQLite local (LOCAL)
-      const [localRowsRaw] = (await profitMirrorSequelize.query(`SELECT codigo, nombre, cargo, activo FROM mecanicos`)) as any;
-      const localRows: any[] = localRowsRaw || [];
+      const [remoteCountResult] = (await profitSequelize.query(
+        `SELECT COUNT(*) AS c FROM [AD_TRANS].[dbo].[mecanicos] WITH (NOLOCK)`
+      )) as any;
+      report.remoteCount = parseInt(remoteCountResult?.[0]?.c ?? '0', 10) || 0;
 
-      // 3. Si MSSQL está disponible, obtener registros remotos (REMOTE) y comparar
-      if (remoteReachable) {
-        const [remoteRowsRaw] = (await profitSequelize.query(
-          `SELECT codigo, nombre, cargo, activo FROM [AD_TRANS].[dbo].[mecanicos] WITH (NOLOCK)`
-        )) as any;
-        const remoteRows: any[] = remoteRowsRaw || [];
+      const [localRowsRaw] = (await profitMirrorSequelize.query(
+        `SELECT codigo, nombre, cargo, activo FROM mecanicos`
+      )) as any;
+      const localRows: any[] = Array.isArray(localRowsRaw) ? localRowsRaw : [];
 
-        const localMap = new Map<string, any>(localRows.map((r: any) => [String(r.codigo).trim(), r]));
-        const remoteMap = new Map<string, any>(remoteRows.map((r: any) => [String(r.codigo).trim(), r]));
+      const [remoteRowsRaw] = (await profitSequelize.query(
+        `SELECT codigo, nombre, cargo, activo FROM [AD_TRANS].[dbo].[mecanicos] WITH (NOLOCK)`
+      )) as any;
+      const remoteRows: any[] = Array.isArray(remoteRowsRaw) ? remoteRowsRaw : [];
 
-        // 4. Insertar en LOCAL (espejo SQLite) los que solo existen en REMOTO (MSSQL)
-        for (const [codigo, remote] of remoteMap.entries()) {
-          if (!localMap.has(codigo)) {
-            try {
-              await MecanicosProfit.create({
-                codigo: remote.codigo,
-                nombre: remote.nombre,
-                cargo: remote.cargo,
-                activo: remote.activo,
-              });
-              report.insertedLocal++;
-              logger.info(`[MasterSyncService:mecanicos] ➕ LOCAL ← MSSQL: ${codigo} - ${remote.nombre}`);
-            } catch (insertErr: any) {
-              report.errors.push(`LOCAL insert ${codigo}: ${insertErr.message}`);
-            }
-          } else {
-            // Comparar diferencias y actualizar si difieren
-            const local = localMap.get(codigo);
-            const differs =
-              String(local?.nombre || '').trim() !== String(remote?.nombre || '').trim() ||
-              String(local?.cargo || '').trim() !== String(remote?.cargo || '').trim() ||
-              Boolean(local?.activo) !== Boolean(remote?.activo);
-            if (differs) {
-              try {
-                await MecanicosProfit.update(
-                  {
-                    nombre: remote.nombre,
-                    cargo: remote.cargo,
-                    activo: remote.activo,
-                  },
-                  { where: { codigo } }
-                );
-                report.updatedLocal++;
-                logger.debug(`[MasterSyncService:mecanicos] ✏️ LOCAL actualizado desde MSSQL: ${codigo}`);
-              } catch (updErr: any) {
-                report.errors.push(`LOCAL update ${codigo}: ${updErr.message}`);
+      const localMap = new Map<string, any>(localRows.map((row: any) => [String(row.codigo ?? '').trim(), row]));
+      const remoteMap = new Map<string, any>(remoteRows.map((row: any) => [String(row.codigo ?? '').trim(), row]));
+
+      for (const [codigo, remoteRow] of remoteMap.entries()) {
+        if (!localMap.has(codigo)) {
+          try {
+            await profitMirrorSequelize.query(
+              `INSERT INTO mecanicos (codigo, nombre, cargo, activo) VALUES (?, ?, ?, ?)`,
+              {
+                replacements: [
+                  codigo,
+                  normalizeText(remoteRow.nombre),
+                  remoteRow.cargo ?? null,
+                  normalizeBool(remoteRow.activo) ? 1 : 0,
+                ],
+                type: QueryTypes.INSERT,
               }
-            } else {
-              report.unchanged++;
-            }
+            );
+            report.insertedLocal++;
+            logger.info(`[MasterSyncService:mecanicos] ➕ LOCAL ← MSSQL: ${codigo} - ${normalizeText(remoteRow.nombre)}`);
+          } catch (insertErr: any) {
+            report.errors.push(`LOCAL insert ${codigo}: ${insertErr.message}`);
           }
+          continue;
         }
 
-        // 5. Insertar en REMOTO (MSSQL) los que solo existen en LOCAL (espejo)
-        for (const [codigo, local] of localMap.entries()) {
-          if (!remoteMap.has(codigo)) {
-            try {
-              await MecanicosProfit.create({
-                codigo: local.codigo,
-                nombre: local.nombre,
-                cargo: local.cargo,
-                activo: local.activo,
-              });
-              report.insertedRemote++;
-              logger.info(`[MasterSyncService:mecanicos] ➕ MSSQL ← LOCAL: ${codigo} - ${local.nombre}`);
-            } catch (insErr: any) {
-              report.errors.push(`REMOTE insert ${codigo}: ${insErr.message}`);
-            }
+        const localRow = localMap.get(codigo)!;
+        if (hasMechanicDifference(localRow, remoteRow)) {
+          try {
+            await profitMirrorSequelize.query(
+              `UPDATE mecanicos SET nombre = ?, cargo = ?, activo = ? WHERE codigo = ?`,
+              {
+                replacements: [
+                  normalizeText(remoteRow.nombre),
+                  remoteRow.cargo ?? null,
+                  normalizeBool(remoteRow.activo) ? 1 : 0,
+                  codigo,
+                ],
+                type: QueryTypes.UPDATE,
+              }
+            );
+            report.updatedLocal++;
+            logger.debug(`[MasterSyncService:mecanicos] ✏️ LOCAL actualizado desde MSSQL: ${codigo}`);
+          } catch (updErr: any) {
+            report.errors.push(`LOCAL update ${codigo}: ${updErr.message}`);
+          }
+
+          try {
+            await profitSequelize.query(
+              `UPDATE [AD_TRANS].[dbo].[mecanicos] SET nombre = ?, cargo = ?, activo = ? WHERE codigo = ?`,
+              {
+                replacements: [
+                  normalizeText(localRow.nombre),
+                  localRow.cargo ?? null,
+                  normalizeBool(localRow.activo) ? 1 : 0,
+                  codigo,
+                ],
+                type: QueryTypes.UPDATE,
+              }
+            );
+            report.updatedRemote++;
+            logger.debug(`[MasterSyncService:mecanicos] ✏️ REMOTE actualizado desde LOCAL: ${codigo}`);
+          } catch (updRemoteErr: any) {
+            report.errors.push(`REMOTE update ${codigo}: ${updRemoteErr.message}`);
+          }
+        } else {
+          report.unchanged++;
+        }
+      }
+
+      for (const [codigo, localRow] of localMap.entries()) {
+        if (!remoteMap.has(codigo)) {
+          try {
+            await profitSequelize.query(
+              `INSERT INTO [AD_TRANS].[dbo].[mecanicos] (codigo, nombre, cargo, activo) VALUES (?, ?, ?, ?)`,
+              {
+                replacements: [
+                  codigo,
+                  normalizeText(localRow.nombre),
+                  localRow.cargo ?? null,
+                  normalizeBool(localRow.activo) ? 1 : 0,
+                ],
+                type: QueryTypes.INSERT,
+              }
+            );
+            report.insertedRemote++;
+            logger.info(`[MasterSyncService:mecanicos] ➕ MSSQL ← LOCAL: ${codigo} - ${normalizeText(localRow.nombre)}`);
+          } catch (insErr: any) {
+            report.errors.push(`REMOTE insert ${codigo}: ${insErr.message}`);
           }
         }
-      } else {
-        logger.warn('[MasterSyncService:mecanicos] MSSQL no disponible. Solo se contabilizaron registros locales.');
       }
     } catch (err: any) {
       report.errors.push(`General: ${err.message}`);
@@ -308,87 +351,110 @@ export class MasterSyncService {
       durationMs: 0,
     };
 
-    try {
-      // 1. Conteos (LOCAL = espejo SQLite, REMOTE = MSSQL)
-      const [localCountResult] = (await profitMirrorSequelize.query(`SELECT COUNT(*) AS c FROM vw_flota_vendedores`)) as any;
-      report.localCount = parseInt(localCountResult?.[0]?.c ?? '0', 10) || 0;
+    const normalizeText = (value: unknown): string => String(value ?? '').trim();
+    const hasVendorDifference = (left: any, right: any): boolean => {
+      return (
+        normalizeText(left?.cedula) !== normalizeText(right?.cedula) ||
+        normalizeText(left?.ven_des) !== normalizeText(right?.ven_des)
+      );
+    };
 
-      if (remoteReachable) {
-        const [remoteCountResult] = (await profitSequelize.query(
-          `SELECT COUNT(*) AS c FROM [AD_TRANS].[dbo].[vw_flota_vendedores] WITH (NOLOCK)`
-        )) as any;
-        report.remoteCount = parseInt(remoteCountResult?.[0]?.c ?? '0', 10) || 0;
+    try {
+      const [localCountResult] = (await profitMirrorSequelize.query(`SELECT COUNT(*) AS c FROM vw_flota_vendedores`)) as any;
+      report.localCount = parseInt(localCountResult?.[0]?.c ?? localCountResult?.[0]?.C ?? '0', 10) || 0;
+
+      if (!remoteReachable) {
+        logger.warn('[MasterSyncService:vendedores] MSSQL no disponible. Solo se contabilizaron registros locales.');
+        report.durationMs = Date.now() - start;
+        return report;
       }
 
-      // 2. Lectura del espejo SQLite local (LOCAL)
+      const [remoteCountResult] = (await profitSequelize.query(
+        `SELECT COUNT(*) AS c FROM [AD_TRANS].[dbo].[vw_flota_vendedores] WITH (NOLOCK)`
+      )) as any;
+      report.remoteCount = parseInt(remoteCountResult?.[0]?.c ?? '0', 10) || 0;
+
       const [localRowsRaw] = (await profitMirrorSequelize.query(
         `SELECT co_ven, cedula, ven_des FROM vw_flota_vendedores`
       )) as any;
-      const localRows: any[] = localRowsRaw || [];
+      const localRows: any[] = Array.isArray(localRowsRaw) ? localRowsRaw : [];
 
-      if (remoteReachable) {
-        const [remoteRowsRaw] = (await profitSequelize.query(
-          `SELECT co_ven, cedula, ven_des FROM [AD_TRANS].[dbo].[vw_flota_vendedores] WITH (NOLOCK)`
-        )) as any;
-        const remoteRows: any[] = remoteRowsRaw || [];
+      const [remoteRowsRaw] = (await profitSequelize.query(
+        `SELECT co_ven, cedula, ven_des FROM [AD_TRANS].[dbo].[vw_flota_vendedores] WITH (NOLOCK)`
+      )) as any;
+      const remoteRows: any[] = Array.isArray(remoteRowsRaw) ? remoteRowsRaw : [];
 
-        const localMap = new Map<string, any>(localRows.map((r: any) => [String(r.co_ven).trim(), r]));
-        const remoteMap = new Map<string, any>(remoteRows.map((r: any) => [String(r.co_ven).trim(), r]));
+      const localMap = new Map<string, any>(localRows.map((row: any) => [String(row.co_ven ?? '').trim(), row]));
+      const remoteMap = new Map<string, any>(remoteRows.map((row: any) => [String(row.co_ven ?? '').trim(), row]));
 
-        // 3. LOCAL ← REMOTO
-        for (const [coVen, remote] of remoteMap.entries()) {
-          if (!localMap.has(coVen)) {
-            try {
-              await VwFlotaVendedores.create({
-                co_ven: remote.co_ven,
-                cedula: remote.cedula,
-                ven_des: remote.ven_des,
-              });
-              report.insertedLocal++;
-              logger.info(`[MasterSyncService:vendedores] ➕ LOCAL ← MSSQL: ${coVen}`);
-            } catch (e: any) {
-              report.errors.push(`LOCAL insert ${coVen}: ${e.message}`);
-            }
-          } else {
-            const local = localMap.get(coVen);
-            const differs =
-              String(local?.cedula || '').trim() !== String(remote?.cedula || '').trim() ||
-              String(local?.ven_des || '').trim() !== String(remote?.ven_des || '').trim();
-            if (differs) {
-              try {
-                await VwFlotaVendedores.update(
-                  { cedula: remote.cedula, ven_des: remote.ven_des },
-                  { where: { co_ven: coVen } }
-                );
-                report.updatedLocal++;
-                logger.debug(`[MasterSyncService:vendedores] ✏️ LOCAL actualizado desde MSSQL: ${coVen}`);
-              } catch (e: any) {
-                report.errors.push(`LOCAL update ${coVen}: ${e.message}`);
+      for (const [coVen, remoteRow] of remoteMap.entries()) {
+        if (!localMap.has(coVen)) {
+          try {
+            await profitMirrorSequelize.query(
+              `INSERT INTO vw_flota_vendedores (co_ven, cedula, ven_des) VALUES (?, ?, ?)`,
+              {
+                replacements: [coVen, normalizeText(remoteRow.cedula), normalizeText(remoteRow.ven_des)],
+                type: QueryTypes.INSERT,
               }
-            } else {
-              report.unchanged++;
-            }
+            );
+            report.insertedLocal++;
+            logger.info(`[MasterSyncService:vendedores] ➕ LOCAL ← MSSQL: ${coVen} - ${normalizeText(remoteRow.ven_des)}`);
+          } catch (e: any) {
+            report.errors.push(`LOCAL insert ${coVen}: ${e.message}`);
           }
+          continue;
         }
 
-        // 4. REMOTO ← LOCAL (MSSQL ← espejo local)
-        for (const [coVen, local] of localMap.entries()) {
-          if (!remoteMap.has(coVen)) {
-            try {
-              await VwFlotaVendedores.create({
-                co_ven: local.co_ven,
-                cedula: local.cedula,
-                ven_des: local.ven_des,
-              });
-              report.insertedRemote++;
-              logger.info(`[MasterSyncService:vendedores] ➕ MSSQL ← LOCAL: ${coVen}`);
-            } catch (e: any) {
-              report.errors.push(`REMOTE insert ${coVen}: ${e.message}`);
-            }
+        const localRow = localMap.get(coVen)!;
+        if (hasVendorDifference(localRow, remoteRow)) {
+          try {
+            await profitMirrorSequelize.query(
+              `UPDATE vw_flota_vendedores SET cedula = ?, ven_des = ? WHERE co_ven = ?`,
+              {
+                replacements: [normalizeText(remoteRow.cedula), normalizeText(remoteRow.ven_des), coVen],
+                type: QueryTypes.UPDATE,
+              }
+            );
+            report.updatedLocal++;
+            logger.debug(`[MasterSyncService:vendedores] ✏️ LOCAL actualizado desde MSSQL: ${coVen}`);
+          } catch (e: any) {
+            report.errors.push(`LOCAL update ${coVen}: ${e.message}`);
+          }
+
+          try {
+            await profitSequelize.query(
+              `UPDATE [AD_TRANS].[dbo].[vw_flota_vendedores] SET cedula = ?, ven_des = ? WHERE co_ven = ?`,
+              {
+                replacements: [normalizeText(localRow.cedula), normalizeText(localRow.ven_des), coVen],
+                type: QueryTypes.UPDATE,
+              }
+            );
+            report.updatedRemote++;
+            logger.debug(`[MasterSyncService:vendedores] ✏️ REMOTE actualizado desde LOCAL: ${coVen}`);
+          } catch (e: any) {
+            report.errors.push(`REMOTE update ${coVen}: ${e.message}`);
+          }
+        } else {
+          report.unchanged++;
+        }
+      }
+
+      for (const [coVen, localRow] of localMap.entries()) {
+        if (!remoteMap.has(coVen)) {
+          try {
+            await profitSequelize.query(
+              `INSERT INTO [AD_TRANS].[dbo].[vw_flota_vendedores] (co_ven, cedula, ven_des) VALUES (?, ?, ?)`,
+              {
+                replacements: [coVen, normalizeText(localRow.cedula), normalizeText(localRow.ven_des)],
+                type: QueryTypes.INSERT,
+              }
+            );
+            report.insertedRemote++;
+            logger.info(`[MasterSyncService:vendedores] ➕ MSSQL ← LOCAL: ${coVen} - ${normalizeText(localRow.ven_des)}`);
+          } catch (e: any) {
+            report.errors.push(`REMOTE insert ${coVen}: ${e.message}`);
           }
         }
-      } else {
-        logger.warn('[MasterSyncService:vendedores] MSSQL no disponible. Solo se contabilizaron registros locales.');
       }
     } catch (err: any) {
       report.errors.push(`General: ${err.message}`);
@@ -418,124 +484,187 @@ export class MasterSyncService {
       durationMs: 0,
     };
 
-    try {
-      // 1. Conteos (LOCAL = espejo SQLite, REMOTE = MSSQL)
-      const [localCountResult] = (await profitMirrorSequelize.query(`SELECT COUNT(*) AS c FROM vw_flota_articulos`)) as any;
-      report.localCount = parseInt(localCountResult?.[0]?.c ?? '0', 10) || 0;
+    const normalizeText = (value: unknown): string => String(value ?? '').trim();
+    const normalizeNumber = (value: unknown): number => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : 0;
+    };
+    const hasArticleDifference = (left: any, right: any): boolean => {
+      return (
+        normalizeText(left?.nombre_producto) !== normalizeText(right?.nombre_producto) ||
+        normalizeText(left?.categoria) !== normalizeText(right?.categoria) ||
+        normalizeText(left?.unidad_medida) !== normalizeText(right?.unidad_medida) ||
+        normalizeNumber(left?.costo) !== normalizeNumber(right?.costo) ||
+        normalizeNumber(left?.stock_act) !== normalizeNumber(right?.stock_act)
+      );
+    };
 
-      if (remoteReachable) {
-        const [remoteCountResult] = (await profitSequelize.query(
-          `SELECT COUNT(*) AS c FROM [AD_TRANS].[dbo].[vw_flota_articulos] WITH (NOLOCK)`
-        )) as any;
-        report.remoteCount = parseInt(remoteCountResult?.[0]?.c ?? '0', 10) || 0;
+    try {
+      const [localCountResult] = (await profitMirrorSequelize.query(`SELECT COUNT(*) AS c FROM vw_flota_articulos`)) as any;
+      report.localCount = parseInt(localCountResult?.[0]?.c ?? localCountResult?.[0]?.C ?? '0', 10) || 0;
+
+      if (!remoteReachable) {
+        logger.warn('[MasterSyncService:articulos] MSSQL no disponible. Solo se contabilizaron registros locales.');
+        report.durationMs = Date.now() - start;
+        return report;
       }
 
-      // 2. Lectura del espejo SQLite local (LOCAL)
+      const [remoteCountResult] = (await profitSequelize.query(
+        `SELECT COUNT(*) AS c FROM [AD_TRANS].[dbo].[vw_flota_articulos] WITH (NOLOCK)`
+      )) as any;
+      report.remoteCount = parseInt(remoteCountResult?.[0]?.c ?? '0', 10) || 0;
+
       const [localRowsRaw] = (await profitMirrorSequelize.query(
         `SELECT codigo_profit, nombre_producto, codigo_categoria, categoria, unidad_medida,
                 costo, tipo, codigo_subalmacen, sub_almacen, codigo_almacen, almacen, stock_act
          FROM vw_flota_articulos`
       )) as any;
-      const localRows: any[] = localRowsRaw || [];
+      const localRows: any[] = Array.isArray(localRowsRaw) ? localRowsRaw : [];
 
-      if (remoteReachable) {
-        const [remoteRowsRaw] = (await profitSequelize.query(
-          `SELECT codigo_profit, nombre_producto, codigo_categoria, categoria, unidad_medida,
-                  costo, tipo, codigo_subalmacen, sub_almacen, codigo_almacen, almacen, stock_act
-           FROM [AD_TRANS].[dbo].[vw_flota_articulos] WITH (NOLOCK)`
-        )) as any;
-        const remoteRows: any[] = remoteRowsRaw || [];
+      const [remoteRowsRaw] = (await profitSequelize.query(
+        `SELECT codigo_profit, nombre_producto, codigo_categoria, categoria, unidad_medida,
+                costo, tipo, codigo_subalmacen, sub_almacen, codigo_almacen, almacen, stock_act
+         FROM [AD_TRANS].[dbo].[vw_flota_articulos] WITH (NOLOCK)`
+      )) as any;
+      const remoteRows: any[] = Array.isArray(remoteRowsRaw) ? remoteRowsRaw : [];
 
-        const localMap = new Map<string, any>(localRows.map((r: any) => [String(r.codigo_profit).trim(), r]));
-        const remoteMap = new Map<string, any>(remoteRows.map((r: any) => [String(r.codigo_profit).trim(), r]));
+      const localMap = new Map<string, any>(localRows.map((row: any) => [String(row.codigo_profit ?? '').trim(), row]));
+      const remoteMap = new Map<string, any>(remoteRows.map((row: any) => [String(row.codigo_profit ?? '').trim(), row]));
 
-        // 3. LOCAL ← REMOTO
-        for (const [codigo, remote] of remoteMap.entries()) {
-          if (!localMap.has(codigo)) {
-            try {
-              await VwFlotaArticulos.create({
-                codigo_profit: remote.codigo_profit,
-                nombre_producto: remote.nombre_producto,
-                codigo_categoria: remote.codigo_categoria,
-                categoria: remote.categoria,
-                unidad_medida: remote.unidad_medida,
-                costo: remote.costo,
-                tipo: remote.tipo,
-                codigo_subalmacen: remote.codigo_subalmacen,
-                sub_almacen: remote.sub_almacen,
-                codigo_almacen: remote.codigo_almacen,
-                almacen: remote.almacen,
-                stock_act: remote.stock_act,
-              });
-              report.insertedLocal++;
-              logger.info(`[MasterSyncService:articulos] ➕ LOCAL ← MSSQL: ${codigo}`);
-            } catch (e: any) {
-              report.errors.push(`LOCAL insert ${codigo}: ${e.message}`);
-            }
-          } else {
-            const local = localMap.get(codigo);
-            const differs =
-              String(local?.nombre_producto || '').trim() !== String(remote?.nombre_producto || '').trim() ||
-              String(local?.categoria || '').trim() !== String(remote?.categoria || '').trim() ||
-              String(local?.unidad_medida || '').trim() !== String(remote?.unidad_medida || '').trim() ||
-              parseFloat(String(local?.costo || 0)) !== parseFloat(String(remote?.costo || 0)) ||
-              parseFloat(String(local?.stock_act || 0)) !== parseFloat(String(remote?.stock_act || 0));
-            if (differs) {
-              try {
-                await VwFlotaArticulos.update(
-                  {
-                    nombre_producto: remote.nombre_producto,
-                    codigo_categoria: remote.codigo_categoria,
-                    categoria: remote.categoria,
-                    unidad_medida: remote.unidad_medida,
-                    costo: remote.costo,
-                    tipo: remote.tipo,
-                    codigo_subalmacen: remote.codigo_subalmacen,
-                    sub_almacen: remote.sub_almacen,
-                    codigo_almacen: remote.codigo_almacen,
-                    almacen: remote.almacen,
-                    stock_act: remote.stock_act,
-                  },
-                  { where: { codigo_profit: codigo } }
-                );
-                report.updatedLocal++;
-                logger.debug(`[MasterSyncService:articulos] ✏️ LOCAL actualizado desde MSSQL: ${codigo}`);
-              } catch (e: any) {
-                report.errors.push(`LOCAL update ${codigo}: ${e.message}`);
+      for (const [codigo, remoteRow] of remoteMap.entries()) {
+        if (!localMap.has(codigo)) {
+          try {
+            await profitMirrorSequelize.query(
+              `INSERT INTO vw_flota_articulos (
+                codigo_profit, nombre_producto, codigo_categoria, categoria, unidad_medida,
+                costo, tipo, codigo_subalmacen, sub_almacen, codigo_almacen, almacen, stock_act
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              {
+                replacements: [
+                  codigo,
+                  normalizeText(remoteRow.nombre_producto),
+                  normalizeText(remoteRow.codigo_categoria),
+                  normalizeText(remoteRow.categoria),
+                  normalizeText(remoteRow.unidad_medida),
+                  normalizeNumber(remoteRow.costo),
+                  normalizeText(remoteRow.tipo),
+                  normalizeText(remoteRow.codigo_subalmacen),
+                  normalizeText(remoteRow.sub_almacen),
+                  normalizeText(remoteRow.codigo_almacen),
+                  normalizeText(remoteRow.almacen),
+                  normalizeNumber(remoteRow.stock_act),
+                ],
+                type: QueryTypes.INSERT,
               }
-            } else {
-              report.unchanged++;
-            }
+            );
+            report.insertedLocal++;
+            logger.info(`[MasterSyncService:articulos] ➕ LOCAL ← MSSQL: ${codigo} - ${normalizeText(remoteRow.nombre_producto)}`);
+          } catch (e: any) {
+            report.errors.push(`LOCAL insert ${codigo}: ${e.message}`);
           }
+          continue;
         }
 
-        // 4. REMOTO ← LOCAL (MSSQL ← espejo local)
-        for (const [codigo, local] of localMap.entries()) {
-          if (!remoteMap.has(codigo)) {
-            try {
-              await VwFlotaArticulos.create({
-                codigo_profit: local.codigo_profit,
-                nombre_producto: local.nombre_producto,
-                codigo_categoria: local.codigo_categoria,
-                categoria: local.categoria,
-                unidad_medida: local.unidad_medida,
-                costo: local.costo,
-                tipo: local.tipo,
-                codigo_subalmacen: local.codigo_subalmacen,
-                sub_almacen: local.sub_almacen,
-                codigo_almacen: local.codigo_almacen,
-                almacen: local.almacen,
-                stock_act: local.stock_act,
-              });
-              report.insertedRemote++;
-              logger.info(`[MasterSyncService:articulos] ➕ MSSQL ← LOCAL: ${codigo}`);
-            } catch (e: any) {
-              report.errors.push(`REMOTE insert ${codigo}: ${e.message}`);
-            }
+        const localRow = localMap.get(codigo)!;
+        if (hasArticleDifference(localRow, remoteRow)) {
+          try {
+            await profitMirrorSequelize.query(
+              `UPDATE vw_flota_articulos SET
+                nombre_producto = ?, codigo_categoria = ?, categoria = ?, unidad_medida = ?,
+                costo = ?, tipo = ?, codigo_subalmacen = ?, sub_almacen = ?, codigo_almacen = ?,
+                almacen = ?, stock_act = ?
+               WHERE codigo_profit = ?`,
+              {
+                replacements: [
+                  normalizeText(remoteRow.nombre_producto),
+                  normalizeText(remoteRow.codigo_categoria),
+                  normalizeText(remoteRow.categoria),
+                  normalizeText(remoteRow.unidad_medida),
+                  normalizeNumber(remoteRow.costo),
+                  normalizeText(remoteRow.tipo),
+                  normalizeText(remoteRow.codigo_subalmacen),
+                  normalizeText(remoteRow.sub_almacen),
+                  normalizeText(remoteRow.codigo_almacen),
+                  normalizeText(remoteRow.almacen),
+                  normalizeNumber(remoteRow.stock_act),
+                  codigo,
+                ],
+                type: QueryTypes.UPDATE,
+              }
+            );
+            report.updatedLocal++;
+            logger.debug(`[MasterSyncService:articulos] ✏️ LOCAL actualizado desde MSSQL: ${codigo}`);
+          } catch (e: any) {
+            report.errors.push(`LOCAL update ${codigo}: ${e.message}`);
+          }
+
+          try {
+            await profitSequelize.query(
+              `UPDATE [AD_TRANS].[dbo].[vw_flota_articulos] SET
+                nombre_producto = ?, codigo_categoria = ?, categoria = ?, unidad_medida = ?,
+                costo = ?, tipo = ?, codigo_subalmacen = ?, sub_almacen = ?, codigo_almacen = ?,
+                almacen = ?, stock_act = ?
+               WHERE codigo_profit = ?`,
+              {
+                replacements: [
+                  normalizeText(localRow.nombre_producto),
+                  normalizeText(localRow.codigo_categoria),
+                  normalizeText(localRow.categoria),
+                  normalizeText(localRow.unidad_medida),
+                  normalizeNumber(localRow.costo),
+                  normalizeText(localRow.tipo),
+                  normalizeText(localRow.codigo_subalmacen),
+                  normalizeText(localRow.sub_almacen),
+                  normalizeText(localRow.codigo_almacen),
+                  normalizeText(localRow.almacen),
+                  normalizeNumber(localRow.stock_act),
+                  codigo,
+                ],
+                type: QueryTypes.UPDATE,
+              }
+            );
+            report.updatedRemote++;
+            logger.debug(`[MasterSyncService:articulos] ✏️ REMOTE actualizado desde LOCAL: ${codigo}`);
+          } catch (e: any) {
+            report.errors.push(`REMOTE update ${codigo}: ${e.message}`);
+          }
+        } else {
+          report.unchanged++;
+        }
+      }
+
+      for (const [codigo, localRow] of localMap.entries()) {
+        if (!remoteMap.has(codigo)) {
+          try {
+            await profitSequelize.query(
+              `INSERT INTO [AD_TRANS].[dbo].[vw_flota_articulos] (
+                codigo_profit, nombre_producto, codigo_categoria, categoria, unidad_medida,
+                costo, tipo, codigo_subalmacen, sub_almacen, codigo_almacen, almacen, stock_act
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              {
+                replacements: [
+                  codigo,
+                  normalizeText(localRow.nombre_producto),
+                  normalizeText(localRow.codigo_categoria),
+                  normalizeText(localRow.categoria),
+                  normalizeText(localRow.unidad_medida),
+                  normalizeNumber(localRow.costo),
+                  normalizeText(localRow.tipo),
+                  normalizeText(localRow.codigo_subalmacen),
+                  normalizeText(localRow.sub_almacen),
+                  normalizeText(localRow.codigo_almacen),
+                  normalizeText(localRow.almacen),
+                  normalizeNumber(localRow.stock_act),
+                ],
+                type: QueryTypes.INSERT,
+              }
+            );
+            report.insertedRemote++;
+            logger.info(`[MasterSyncService:articulos] ➕ MSSQL ← LOCAL: ${codigo} - ${normalizeText(localRow.nombre_producto)}`);
+          } catch (e: any) {
+            report.errors.push(`REMOTE insert ${codigo}: ${e.message}`);
           }
         }
-      } else {
-        logger.warn('[MasterSyncService:articulos] MSSQL no disponible. Solo se contabilizaron registros locales.');
       }
     } catch (err: any) {
       report.errors.push(`General: ${err.message}`);

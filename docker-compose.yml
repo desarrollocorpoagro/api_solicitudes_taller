@@ -9,9 +9,9 @@ services:
     container_name: sanluis_backend_api
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "4100:4100"
     environment:
-      - PORT=4000
+      - PORT=4100
       - NODE_ENV=production
       - JWT_SECRET=development-secret-keys-for-sanluis-app-2026
       - JWT_PREAUTH_SECRET=development-preauth-secret-keys-for-sanluis-app-2026

@@ -23,7 +23,7 @@ dotenv.config();
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const basePort = Number(process.env.PORT || 3000);
   const isProduction = process.env.NODE_ENV === 'production';
 
   // Configurar trust proxy para proxies inversos (Cloud Run / Nginx / Vite)
@@ -145,14 +145,27 @@ async function startServer() {
     logger.error(`[DatabaseInit] Error inicializando bases de datos: ${dbErr.message}`);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    logger.info(`========================================================`);
-    logger.info(`🚜 [San Luis Backend] Servidor Express activo en puerto ${PORT}`);
-    logger.info(`📚 Swagger UI disponible en: http://localhost:${PORT}/api-docs`);
-    logger.info(`📄 Especificación JSON en: http://localhost:${PORT}/api-docs-json`);
-    logger.info(`🏥 Healthcheck: http://localhost:${PORT}/health`);
-    logger.info(`========================================================`);
-  });
+  const listenOnPort = (port: number): void => {
+    const server = app.listen(port, '0.0.0.0', () => {
+      logger.info(`========================================================`);
+      logger.info(`🚜 [San Luis Backend] Servidor Express activo en puerto ${port}`);
+      logger.info(`📚 Swagger UI disponible en: http://localhost:${port}/api-docs`);
+      logger.info(`📄 Especificación JSON en: http://localhost:${port}/api-docs-json`);
+      logger.info(`🏥 Healthcheck: http://localhost:${port}/health`);
+      logger.info(`========================================================`);
+    });
+
+    server.on('error', (err: any) => {
+      if (err && err.code === 'EADDRINUSE') {
+        logger.warn(`[Server] Puerto ${port} ocupado; intentando ${port + 1}...`);
+        listenOnPort(port + 1);
+        return;
+      }
+      throw err;
+    });
+  };
+
+  listenOnPort(basePort);
 }
 
 startServer().catch((error) => {
