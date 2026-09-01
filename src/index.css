@@ -58,7 +58,7 @@ body {
   margin: 0 auto;
   padding: 16px 16px 140px;
   box-sizing: border-box;
-  
+
 }
 
 @media (max-width: 768px) {
@@ -688,6 +688,53 @@ td.num, th.num {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+/* ---------- autocompletado (combobox) ---------- */
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .12);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 50;
+  list-style: none;
+  margin-top: 4px;
+  padding: 4px 0;
+}
+
+.autocomplete-item {
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.12s ease;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.autocomplete-item:last-child {
+  border-bottom: 0;
+}
+
+.autocomplete-item:hover {
+  background: var(--info-soft);
+}
+
+.autocomplete-item strong {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.autocomplete-empty {
+  padding: 12px;
+  color: var(--slate);
+  font-size: 13px;
+  text-align: center;
+  font-style: italic;
 }
 
 @media (prefers-reduced-motion: no-preference) {

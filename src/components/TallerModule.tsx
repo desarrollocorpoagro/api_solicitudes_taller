@@ -129,6 +129,14 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
   const [vendedorSearch, setVendedorSearch] = useState('');
   const [showVendedoresDropdown, setShowVendedoresDropdown] = useState(false);
 
+  // Autocompletado para selección de Orden de Área
+  const [otSearch, setOtSearch] = useState('');
+  const [showOtDropdown, setShowOtDropdown] = useState(false);
+
+  // Autocompletado para selección de Repuesto
+  const [repSearch, setRepSearch] = useState('');
+  const [showRepDropdown, setShowRepDropdown] = useState(false);
+
   // Listas de trabajo de la orden actual
   const [ots, setOts] = useState<AreaOT[]>([]);
   const [reps, setReps] = useState<SolicitudRep[]>([]);
@@ -1464,22 +1472,115 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
           <div className="grid g2" style={{ marginBottom: 14 }}>
             <label className="f">
               <span className="req">Orden de área</span>
-              <select
-                value={formRep.otId}
-                onChange={(e) => setFormRep({ ...formRep, otId: e.target.value })}
-              >
-                {ots.map(o => <option key={o.id} value={o.id}>{o.id} — {o.area}</option>)}
-              </select>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={otSearch !== '' ? otSearch : (formRep.otId ? ots.find(o => o.id === formRep.otId)?.id + ' — ' + ots.find(o => o.id === formRep.otId)?.area : '')}
+                  onChange={(e) => {
+                    setOtSearch(e.target.value);
+                    setShowOtDropdown(true);
+                  }}
+                  onFocus={() => {
+                    setOtSearch('');
+                    setShowOtDropdown(true);
+                  }}
+                  onBlur={() => setTimeout(() => setShowOtDropdown(false), 200)}
+                  placeholder="Buscar orden de área..."
+                  className="mono"
+                />
+                {showOtDropdown && ots.length > 0 && (
+                  <ul className="autocomplete-dropdown">
+                    {ots
+                      .filter(o => {
+                        const search = otSearch.toLowerCase();
+                        if (!search) return true;
+                        return (
+                          o.id.toLowerCase().includes(search) ||
+                          o.area.toLowerCase().includes(search)
+                        );
+                      })
+                      .slice(0, 50)
+                      .map(o => (
+                        <li
+                          key={o.id}
+                          onMouseDown={() => {
+                            setFormRep({ ...formRep, otId: o.id });
+                            setOtSearch('');
+                            setShowOtDropdown(false);
+                          }}
+                          className="autocomplete-item"
+                        >
+                          <strong className="mono">{o.id}</strong> — {o.area}
+                          {o.mecanico && <span style={{ color: 'var(--slate)', fontSize: 11, marginLeft: 6 }}>· {o.mecanico}</span>}
+                        </li>
+                      ))}
+                    {ots.filter(o => {
+                      const search = otSearch.toLowerCase();
+                      if (!search) return true;
+                      return o.id.toLowerCase().includes(search) || o.area.toLowerCase().includes(search);
+                    }).length === 0 && (
+                      <li className="autocomplete-empty">Sin resultados</li>
+                    )}
+                  </ul>
+                )}
+              </div>
             </label>
             <label className="f">
               <span className="req">Repuesto</span>
-              <select
-                value={formRep.cod}
-                onChange={(e) => setFormRep({ ...formRep, cod: e.target.value })}
-                className="mono"
-              >
-                {catalogo.map(c => <option key={c.cod} value={c.cod}>{c.cod} — {c.desc} (Stock: {c.stock} | ${c.costo})</option>)}
-              </select>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={repSearch !== '' ? repSearch : (formRep.cod ? catalogo.find(c => c.cod === formRep.cod)?.cod + ' — ' + catalogo.find(c => c.cod === formRep.cod)?.desc : '')}
+                  onChange={(e) => {
+                    setRepSearch(e.target.value);
+                    setShowRepDropdown(true);
+                  }}
+                  onFocus={() => {
+                    setRepSearch('');
+                    setShowRepDropdown(true);
+                  }}
+                  onBlur={() => setTimeout(() => setShowRepDropdown(false), 200)}
+                  placeholder="Buscar por código o descripción..."
+                  className="mono"
+                />
+                {showRepDropdown && catalogo.length > 0 && (
+                  <ul className="autocomplete-dropdown">
+                    {catalogo
+                      .filter(c => {
+                        const search = repSearch.toLowerCase();
+                        if (!search) return true;
+                        return (
+                          c.cod.toLowerCase().includes(search) ||
+                          (c.desc || '').toLowerCase().includes(search)
+                        );
+                      })
+                      .slice(0, 50)
+                      .map(c => (
+                        <li
+                          key={c.cod}
+                          onMouseDown={() => {
+                            setFormRep({ ...formRep, cod: c.cod });
+                            setRepSearch('');
+                            setShowRepDropdown(false);
+                          }}
+                          className="autocomplete-item"
+                        >
+                          <strong className="mono">{c.cod}</strong> — {c.desc}
+                          <span style={{ color: 'var(--slate)', fontSize: 11, marginLeft: 6 }}>
+                            · Stock: {c.stock} · ${c.costo}
+                          </span>
+                        </li>
+                      ))}
+                    {catalogo.filter(c => {
+                      const search = repSearch.toLowerCase();
+                      if (!search) return true;
+                      return c.cod.toLowerCase().includes(search) || (c.desc || '').toLowerCase().includes(search);
+                    }).length === 0 && (
+                      <li className="autocomplete-empty">Sin resultados</li>
+                    )}
+                  </ul>
+                )}
+              </div>
             </label>
           </div>
 
