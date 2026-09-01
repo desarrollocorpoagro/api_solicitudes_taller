@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Ubicación del mapa del sitio para facilitar el rastreo
+Sitemap: https://www.gruposanluis.com/sitemap.xml

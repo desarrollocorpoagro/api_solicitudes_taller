@@ -88,6 +88,18 @@ async function startServer() {
     }
   });
 
+  // 4.1 Sitemap para Search Console
+  app.get('/sitemap.xml', (_req: Request, res: Response) => {
+    const sitemapPath = path.resolve(process.cwd(), 'public', 'sitemap.xml');
+    res.setHeader('Content-Type', 'application/xml');
+    res.sendFile(sitemapPath, (err) => {
+      if (err) {
+        logger.warn(`[Sitemap] Archivo no encontrado: ${sitemapPath}`);
+        res.status(404).send('Sitemap no disponible');
+      }
+    });
+  });
+
   // 5. Montar Rutas Modulares de la API
   app.use('/api/v1', apiRateLimiter, apiRoutes);
 
