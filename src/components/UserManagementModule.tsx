@@ -27,6 +27,7 @@ import {
   Table,
   Plus
 } from 'lucide-react';
+import { usePermissions } from '../hooks/usePermissions';
 
 const ALL_ROLES = [
   { id: 'ADMIN', label: 'ADMINISTRADOR', desc: 'Acceso total y configuración de bases de datos, permisos y auditoría', color: 'b-bad' },
@@ -53,7 +54,26 @@ const MODULE_DEFINITIONS = [
 ];
 
 export const UserManagementModule: React.FC<{ token: string; currentUser?: any }> = ({ token, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'connections' | 'permissions' | 'queries'>('users');
+  const { can, isAdmin } = usePermissions(currentUser);
+
+  // Permisos por sub-sección del módulo.
+  const canUsersRead = can('users', 'read');
+  const canUsersWrite = can('users', 'create') || can('users', 'update') || can('users', 'delete');
+  const canConnsRead = can('db_connections', 'read');
+  const canConnsWrite = can('db_connections', 'create') || can('db_connections', 'update') || can('db_connections', 'delete');
+  const canPermsRead = can('permissions', 'read');
+  const canPermsWrite = can('permissions', 'update');
+  const canQueriesExec = can('query_runner', 'execute_query') || can('query_runner', 'read');
+
+  type TabId = 'users' | 'connections' | 'permissions' | 'queries';
+  const availableTabs: TabId[] = [
+    canUsersRead && 'users',
+    canConnsRead && 'connections',
+    canPermsRead && 'permissions',
+    canQueriesExec && 'queries',
+  ].filter(Boolean) as TabId[];
+
+  const [activeTab, setActiveTab] = useState<TabId>(availableTabs[0] || 'users');
 
   // ================= USERS STATE =================
   const [users, setUsers] = useState<any[]>([]);
@@ -541,30 +561,38 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
 
           {/* Sub-Navegación de Pestañas */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`btn ${activeTab === 'users' ? 'dark' : ''}`}
-            >
-              <Users className="w-4 h-4" /> Usuarios & Empresas
-            </button>
-            <button
-              onClick={() => setActiveTab('connections')}
-              className={`btn ${activeTab === 'connections' ? 'dark' : ''}`}
-            >
-              <Database className="w-4 h-4" /> Conexiones MSSQL
-            </button>
-            <button
-              onClick={() => setActiveTab('permissions')}
-              className={`btn ${activeTab === 'permissions' ? 'dark' : ''}`}
-            >
-              <Lock className="w-4 h-4" /> Matriz de Permisos
-            </button>
-            <button
-              onClick={() => setActiveTab('queries')}
-              className={`btn ${activeTab === 'queries' ? 'dark' : ''}`}
-            >
-              <Terminal className="w-4 h-4" /> Ejecutor SQL
-            </button>
+            {canUsersRead && (
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`btn ${activeTab === 'users' ? 'dark' : ''}`}
+              >
+                <Users className="w-4 h-4" /> Usuarios & Empresas
+              </button>
+            )}
+            {canConnsRead && (
+              <button
+                onClick={() => setActiveTab('connections')}
+                className={`btn ${activeTab === 'connections' ? 'dark' : ''}`}
+              >
+                <Database className="w-4 h-4" /> Conexiones MSSQL
+              </button>
+            )}
+            {canPermsRead && (
+              <button
+                onClick={() => setActiveTab('permissions')}
+                className={`btn ${activeTab === 'permissions' ? 'dark' : ''}`}
+              >
+                <Lock className="w-4 h-4" /> Matriz de Permisos
+              </button>
+            )}
+            {canQueriesExec && (
+              <button
+                onClick={() => setActiveTab('queries')}
+                className={`btn ${activeTab === 'queries' ? 'dark' : ''}`}
+              >
+                <Terminal className="w-4 h-4" /> Ejecutor SQL
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -611,7 +639,12 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
                 <button onClick={fetchUsers} className="btn">
                   <RefreshCw className={`w-3.5 h-3.5 ${usersLoading ? 'animate-spin' : ''}`} />
                 </button>
-                <button onClick={handleOpenCreateUser} className="btn dark">
+                <button
+                  onClick={handleOpenCreateUser}
+                  className="btn dark"
+                  disabled={!can('users', 'create')}
+                  title={!can('users', 'create') ? 'Su rol no permite crear usuarios' : undefined}
+                >
                   <UserPlus className="w-4 h-4" /> Nuevo Usuario
                 </button>
               </div>
@@ -682,16 +715,18 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
                               <button
                                 onClick={() => handleOpenEditUser(u)}
                                 className="btn"
+                                disabled={!can('users', 'update')}
                                 style={{ minHeight: 'auto', padding: '6px 8px', fontSize: 12 }}
-                                title="Editar usuario y asignación de rol"
+                                title={!can('users', 'update') ? 'Su rol no permite editar usuarios' : 'Editar usuario y asignación de rol'}
                               >
                                 <Edit2 className="w-3.5 h-3.5 text-[var(--navy)]" />
                               </button>
                               <button
                                 onClick={() => handleDeleteUser(u.id)}
                                 className="btn danger"
+                                disabled={!can('users', 'delete')}
                                 style={{ minHeight: 'auto', padding: '6px 8px', fontSize: 12 }}
-                                title="Eliminar usuario"
+                                title={!can('users', 'delete') ? 'Su rol no permite eliminar usuarios' : 'Eliminar usuario'}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -924,8 +959,9 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
                 </select>
                 <button
                   onClick={handleSaveRolePermissions}
-                  disabled={permSaving}
+                  disabled={permSaving || !canPermsWrite}
                   className="btn dark"
+                  title={!canPermsWrite ? 'Su rol no permite modificar la matriz de permisos' : undefined}
                 >
                   {permSaving ? 'Guardando...' : 'Guardar Permisos'}
                 </button>
@@ -1020,11 +1056,17 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
           {/* Consultas Rápidas Preconfiguradas */}
           <div className="card">
             <h3 style={{ margin: '0 0 10px 0', fontSize: 16 }}>Consultas Rápidas Preconfiguradas (Profit Plus AD_TRANS)</h3>
+            {!canQueriesExec && (
+              <div style={{ padding: 12, background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--r)', color: '#991B1B', fontSize: 13, marginBottom: 12 }}>
+                Su rol actual no tiene permisos para ejecutar SQL directo en el ERP.
+              </div>
+            )}
             <div className="grid g3">
               {PRESET_QUERIES.map((pq, idx) => (
                 <div
                   key={idx}
                   onClick={() => {
+                    if (!canQueriesExec) return;
                     setSqlQuery(pq.sql);
                     handleExecuteQuery(pq.sql);
                   }}
@@ -1033,7 +1075,8 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
                     borderRadius: 'var(--r)',
                     padding: 12,
                     background: '#FAFBFC',
-                    cursor: 'pointer',
+                    cursor: canQueriesExec ? 'pointer' : 'not-allowed',
+                    opacity: canQueriesExec ? 1 : 0.6,
                     transition: 'all 0.2s',
                   }}
                   className="hover:border-[var(--navy)] hover:shadow-sm"
@@ -1070,8 +1113,9 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
                 </select>
                 <button
                   onClick={() => handleExecuteQuery()}
-                  disabled={queryExecuting}
+                  disabled={queryExecuting || !canQueriesExec}
                   className="btn dark"
+                  title={!canQueriesExec ? 'Su rol no permite ejecutar consultas SQL' : undefined}
                 >
                   <Play className={`w-3.5 h-3.5 ${queryExecuting ? 'animate-spin' : ''}`} />
                   {queryExecuting ? 'Ejecutando...' : 'Ejecutar Query'}

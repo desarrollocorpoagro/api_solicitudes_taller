@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Mail, Send, CheckCircle, Smartphone, RefreshCw } from 'lucide-react';
+import { usePermissions } from '../hooks/usePermissions';
 
-export const NotificationsModule: React.FC = () => {
+export const NotificationsModule: React.FC<{ currentUser?: any }> = ({ currentUser }) => {
+  const { can } = usePermissions(currentUser);
+  const canSend = can('notifications', 'create');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [emailForm, setEmailForm] = useState({
@@ -152,16 +155,18 @@ export const NotificationsModule: React.FC = () => {
             <div className="flex gap-2 pt-2">
               <button
                 type="submit"
-                disabled={sending}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center justify-center gap-1.5 shadow-sm transition-colors"
+                disabled={sending || !canSend}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center justify-center gap-1.5 shadow-sm transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+                title={!canSend ? 'Su rol no permite enviar notificaciones' : undefined}
               >
                 <Send className="w-3.5 h-3.5" /> Enviar Correo
               </button>
               <button
                 type="button"
                 onClick={handleSendPush}
-                disabled={sending}
-                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2 px-4 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+                disabled={sending || !canSend}
+                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2 px-4 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={!canSend ? 'Su rol no permite enviar notificaciones' : undefined}
               >
                 <Smartphone className="w-3.5 h-3.5 text-blue-600" /> Emitir Push
               </button>

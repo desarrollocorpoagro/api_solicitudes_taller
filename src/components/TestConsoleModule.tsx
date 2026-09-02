@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { Play, CheckCircle2, XCircle, Terminal, RefreshCw } from 'lucide-react';
+import { usePermissions } from '../hooks/usePermissions';
 
-export const TestConsoleModule: React.FC = () => {
+export const TestConsoleModule: React.FC<{ currentUser?: any }> = ({ currentUser }) => {
+  const { can } = usePermissions(currentUser);
+  const canRun = can('query_runner', 'read') || can('query_runner', 'execute_query');
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<any>(null);
 
@@ -33,8 +36,9 @@ export const TestConsoleModule: React.FC = () => {
         </div>
         <button
           onClick={handleRunTests}
-          disabled={running}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm transition-colors"
+          disabled={running || !canRun}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+          title={!canRun ? 'Su rol no permite ejecutar la consola de pruebas' : undefined}
         >
           {running ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
           {running ? 'Ejecutando Suite...' : 'Ejecutar Pruebas Ahora'}

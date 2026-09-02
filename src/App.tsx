@@ -20,6 +20,8 @@ import TestConsoleModule from './components/TestConsoleModule';
 import SyncStatusBadge from './components/SyncStatusBadge';
 import RoleSimulatorBar from './components/RoleSimulatorBar';
 import SanLuisLogo from './components/SanLuisLogo';
+import PermissionGate from './components/PermissionGate';
+import { usePermissions } from './hooks/usePermissions';
 
 export default function App() {
   const [token, setToken] = useState<string>('');
@@ -28,6 +30,12 @@ export default function App() {
   const [activeCompany, setActiveCompany] = useState<any>(null);
   const [activeNav, setActiveNav] = useState<'taller' | 'usuarios' | 'swagger' | 'notificaciones' | 'multimedia' | 'pruebas'>('taller');
   const [loading, setLoading] = useState(false);
+
+  // Hooks deben invocarse SIEMPRE en el mismo orden y antes de cualquier
+  // early return. Si los movemos debajo del return de LoginScreen, React
+  // detecta un cambio en el número de hooks entre renders
+  // ("Rendered more hooks than during the previous render").
+  const { visibleNav } = usePermissions(user);
 
   const handleLoginSuccess = (data: {
     token: string;
@@ -121,14 +129,36 @@ export default function App() {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
+  // Definición maestra de los módulos de navegación. El filtro por permisos
+  // se aplica al renderizar: ADMIN ve todo, los demás roles solo lo que su
+  // matriz de permisos autorice.
   const navItems = [
-    { id: 'taller', label: 'Taller San Luis', icon: Wrench },
-    { id: 'usuarios', label: 'Gestión Usuarios (RBAC)', icon: Users },
-    { id: 'swagger', label: 'Swagger API Explorer', icon: BookOpen },
-    { id: 'notificaciones', label: 'Notificaciones & Push', icon: Bell },
-    { id: 'multimedia', label: 'Archivos Multimedia', icon: ImageIcon },
-    { id: 'pruebas', label: 'Consola Pruebas Unitarias', icon: Terminal },
-  ] as const;
+    { id: 'taller', label: 'Taller San Luis', icon: Wrench, module: 'taller' as const, requires: 'read' as const },
+    { id: 'usuarios', label: 'Gestión Usuarios (RBAC)', icon: Users, module: 'users' as const, requires: 'read' as const },
+    { id: 'swagger', label: 'Swagger API Explorer', icon: BookOpen, module: 'swagger' as const, requires: 'read' as const },
+    { id: 'notificaciones', label: 'Notificaciones & Push', icon: Bell, module: 'notifications' as const, requires: 'read' as const },
+    { id: 'multimedia', label: 'Archivos Multimedia', icon: ImageIcon, module: 'multimedia' as const, requires: 'read' as const },
+    { id: 'pruebas', label: 'Consola Pruebas Unitarias', icon: Terminal, module: 'query_runner' as const, requires: 'read' as const },
+  ];
+
+  // Filtra los ítems según permisos; ADMIN siempre ve todo.
+  const filteredNav = navItems.filter((n) =>
+    visibleNav.some((v) => v.id === n.id)
+  );
+
+  // Si la pestaña activa quedó oculta por un cambio de rol, vuelve a 'taller'
+  // si está disponible o al primer ítem visible.
+  
+  console.log('filteredNav ',filteredNav)
+  if (
+    !filteredNav.some((n) => n.id === activeNav) &&
+    filteredNav.length > 0
+  ) {
+    const fallback = filteredNav.find((n) => n.id === 'taller') ? 'taller' : (filteredNav[0]?.id as typeof activeNav);
+    if (fallback) {
+      setActiveNav(fallback as typeof activeNav);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col font-['Rubik'] antialiased selection:bg-[var(--lime-soft)] selection:text-[var(--navy)]">
@@ -192,7 +222,7 @@ export default function App() {
         {/* Barra de Navegación de Módulos */}
         <nav className="tabs" aria-label="Navegación principal de módulos">
           <div className="tabs-in">
-            {navItems.map((nav) => {
+            {filteredNav.map((nav) => {
               const Icon = nav.icon;
               const isActive = activeNav === nav.id;
               return (
@@ -212,23 +242,52 @@ export default function App() {
         </nav>
       </header>
 
-      {/* Simulador y Selector Rápido de Roles para Pruebas */}
-      <RoleSimulatorBar
+      {/* ============================================================
+          BARRA DE SIMULACIÓN DE ROLES (solo para ADMIN)
+          ------------------------------------------------------------
+          Esta barra permite al Administrador Global saltar entre las
+          cuentas semilla de cada rol (GERENTE_TALLER, SUPERVISOR,
+          MECANICO, etc.) para validar la matriz RBAC y los módulos
+          visibles por cada perfil.
+
+          Restricciones:
+          - Renderizada SOLO si el usuario tiene la acción 'admin'
+            sobre el módulo 'permissions' (en la práctica, solo ADMIN).
+          - Para el resto de roles el componente se oculta por completo
+            (mode="hide") y la barra no aparece en el DOM.
+          - Está separada del <header> corporativo para que sea claro
+            que es una HERRAMIENTA DE PRUEBAS, no parte del flujo de
+            negocio.
+          ============================================================ */}
+      <PermissionGate
         currentUser={user}
-        activeCompany={activeCompany}
-        onSwitchRole={handleSwitchRole}
-        loading={loading}
-      />
+        module="permissions"
+        action="admin"
+        mode="hide"
+      >
+        <section
+          aria-label="Herramienta de simulación de roles para pruebas QA"
+          data-testid="role-simulator-bar"
+          className="border-b border-amber-300/60 bg-amber-50/70"
+        >
+          <RoleSimulatorBar
+            currentUser={user}
+            activeCompany={activeCompany}
+            onSwitchRole={handleSwitchRole}
+            loading={loading}
+          />
+        </section>
+      </PermissionGate>
 
       {/* Contenido Principal */}
       <main className="wrap flex-1">
         <div key={activeNav} className="module-fade">
           {activeNav === 'taller' && <TallerModule token={token} activeCompany={activeCompany} currentUser={user} />}
-          {activeNav === 'usuarios' && <UserManagementModule token={token} currentUser={user} />}
-          {activeNav === 'swagger' && <SwaggerModule />}
-          {activeNav === 'notificaciones' && <NotificationsModule />}
-          {activeNav === 'multimedia' && <MultimediaModule />}
-          {activeNav === 'pruebas' && <TestConsoleModule />}
+          {activeNav === 'usuarios' && visibleNav.some((v) => v.id === 'usuarios') && <UserManagementModule token={token} currentUser={user} />}
+          {activeNav === 'swagger' && visibleNav.some((v) => v.id === 'swagger') && <SwaggerModule />}
+          {activeNav === 'notificaciones' && visibleNav.some((v) => v.id === 'notificaciones') && <NotificationsModule currentUser={user} />}
+          {activeNav === 'multimedia' && visibleNav.some((v) => v.id === 'multimedia') && <MultimediaModule currentUser={user} />}
+          {activeNav === 'pruebas' && visibleNav.some((v) => v.id === 'pruebas') && <TestConsoleModule currentUser={user} />}
         </div>
       </main>
 

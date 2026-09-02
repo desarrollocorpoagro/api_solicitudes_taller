@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Image, Upload, Trash2, FileText, CheckCircle, ExternalLink, Download, Copy, Shield, Sparkles } from 'lucide-react';
 import SanLuisLogo from './SanLuisLogo';
+import { usePermissions } from '../hooks/usePermissions';
 
-export const MultimediaModule: React.FC = () => {
+export const MultimediaModule: React.FC<{ currentUser?: any }> = ({ currentUser }) => {
+  const { can } = usePermissions(currentUser);
+  const canUpload = can('multimedia', 'create');
   const [files, setFiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -125,7 +128,9 @@ export const MultimediaModule: React.FC = () => {
           <div>
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center justify-center gap-1.5 h-[38px] shadow-sm transition-colors"
+              disabled={!canUpload}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center justify-center gap-1.5 h-[38px] shadow-sm transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+              title={!canUpload ? 'Su rol no permite cargar archivos multimedia' : undefined}
             >
               <Upload className="w-4 h-4" /> Subir Archivo
             </button>

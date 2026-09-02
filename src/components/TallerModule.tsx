@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { OrdenAuditHistory } from './OrdenAuditHistory';
 import SanLuisLogo from './SanLuisLogo';
+import { usePermissions } from '../hooks/usePermissions';
+import PermissionGate from './PermissionGate';
 
 interface MecanicoProfitItem {
   codigo: string;
@@ -96,6 +98,12 @@ interface SolicitudExt {
 }
 
 export const TallerModule: React.FC<{ token: string; activeCompany: any; currentUser?: any }> = ({ token, activeCompany, currentUser }) => {
+  const { can, isAdmin } = usePermissions(currentUser);
+  const canCreate = can('taller', 'create');
+  const canUpdate = can('taller', 'update');
+  const canApprove = can('taller', 'approve');
+  const canClose = can('taller', 'close');
+  const canDispatch = can('almacen', 'dispatch');
   const [activeTab, setActiveTab] = useState<'apertura' | 'areas' | 'repuestos' | 'externos' | 'aprob' | 'almacen' | 'cierre' | 'auditoria'>('apertura');
 
   // Listas de la empresa activa
@@ -815,15 +823,15 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
       <div className="tabs" style={{ borderRadius: 'var(--r)', marginBottom: 16 }}>
         <div className="tabs-in">
           {[
-            { id: 'apertura', num: '01', label: 'Apertura', flag: !unidad || !sintomas.trim() },
-            { id: 'areas', num: '02', label: 'Áreas y diagnóstico', flag: !ots.length || otsAbiertas.length > 0 },
-            { id: 'repuestos', num: '03', label: 'Repuestos', flag: false },
-            { id: 'externos', num: '04', label: 'Servicios externos', flag: false },
-            { id: 'aprob', num: '05', label: 'Aprobaciones', flag: pendAprob > 0 },
-            { id: 'almacen', num: '06', label: 'Almacén', flag: sinDespacho > 0 },
-            { id: 'cierre', num: '07', label: 'Cierre', flag: !puedeCerrar },
-            { id: 'auditoria', num: '08', label: 'Auditoría / Trazabilidad', flag: false },
-          ].map(t => (
+            { id: 'apertura', num: '01', label: 'Apertura', flag: !unidad || !sintomas.trim(), perm: can('taller', 'read') },
+            { id: 'areas', num: '02', label: 'Áreas y diagnóstico', flag: !ots.length || otsAbiertas.length > 0, perm: can('taller', 'read') },
+            { id: 'repuestos', num: '03', label: 'Repuestos', flag: false, perm: can('taller', 'read') || can('almacen', 'read') },
+            { id: 'externos', num: '04', label: 'Servicios externos', flag: false, perm: can('taller', 'read') },
+            { id: 'aprob', num: '05', label: 'Aprobaciones', flag: pendAprob > 0, perm: canApprove || isAdmin },
+            { id: 'almacen', num: '06', label: 'Almacén', flag: sinDespacho > 0, perm: canDispatch || can('almacen', 'read') },
+            { id: 'cierre', num: '07', label: 'Cierre', flag: !puedeCerrar, perm: canClose || can('taller', 'read') },
+            { id: 'auditoria', num: '08', label: 'Auditoría / Trazabilidad', flag: false, perm: can('taller', 'read') },
+          ].filter(t => t.perm).map(t => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id as any)}
@@ -1304,7 +1312,7 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
                 <button
                   type="button"
                   onClick={handleActualizarOrdenExistente}
-                  disabled={loading}
+                  disabled={loading || !canUpdate}
                   className="btn"
                   style={{
                     padding: '8px 16px',
@@ -1313,7 +1321,7 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
                     borderColor: '#93c5fd',
                     color: '#1d4ed8',
                   }}
-                  title="Registra los cambios en kilometraje, síntomas o conductores en la bitácora de auditoría"
+                  title={!canUpdate ? 'Su rol no permite modificar órdenes' : 'Registra los cambios en kilometraje, síntomas o conductores en la bitácora de auditoría'}
                 >
                   <Save className="w-4 h-4 text-blue-600" />
                   {loading ? 'Guardando...' : 'Guardar y Auditar Modificaciones'}
@@ -1322,9 +1330,10 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
 
               <button
                 onClick={handleCrearNuevaOrden}
-                disabled={creandoOrden || !unidad || !sintomas.trim()}
+                disabled={creandoOrden || !unidad || !sintomas.trim() || !canCreate}
                 className="btn dark"
                 style={{ padding: '8px 18px', fontWeight: 600 }}
+                title={!canCreate ? 'Su rol no permite aperturar nuevas órdenes' : undefined}
               >
                 {creandoOrden ? 'Aperturando...' : `💾 Aperturar Nueva Orden para ${activeCompany?.code || 'Empresa'}`}
               </button>
@@ -1397,7 +1406,9 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
           </label>
           <button
             onClick={handleCrearArea}
+            disabled={!canCreate}
             className="btn dark"
+            title={!canCreate ? 'Su rol no permite crear órdenes de área' : undefined}
           >
             Abrir orden de área
           </button>
@@ -1452,7 +1463,9 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
                 <div className="row-end">
                   <button
                     onClick={() => handleUpdateArea(ot.id, { estado: ot.estado === 'cerrada' ? 'abierta' : 'cerrada' })}
+                    disabled={!canUpdate}
                     className={`btn ${ot.estado === 'cerrada' ? '' : 'dark'}`}
+                    title={!canUpdate ? 'Su rol no permite modificar el estado de la orden de área' : undefined}
                   >
                     {ot.estado === 'cerrada' ? 'Reabrir orden de área' : 'Cerrar orden de área'}
                   </button>
@@ -1607,7 +1620,9 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
 
           <button
             onClick={handleCrearRepuesto}
+            disabled={!canCreate}
             className="btn dark"
+            title={!canCreate ? 'Su rol no permite crear solicitudes de repuesto' : undefined}
           >
             Agregar solicitud
           </button>
@@ -1727,7 +1742,9 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
 
           <button
             onClick={handleCrearExterno}
+            disabled={!canCreate}
             className="btn dark"
+            title={!canCreate ? 'Su rol no permite crear solicitudes externas' : undefined}
           >
             Agregar solicitud
           </button>
@@ -1814,13 +1831,17 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
                       <div className="row-end">
                         <button
                           onClick={() => handleProcesarAprobacion(item.tipo, item.id, 'APROBAR')}
+                          disabled={!canApprove}
                           className="btn dark"
+                          title={!canApprove ? 'Su rol no permite aprobar solicitudes' : undefined}
                         >
                           {escala ? 'Aprobar y escalar' : 'Aprobar'}
                         </button>
                         <button
                           onClick={() => handleProcesarAprobacion(item.tipo, item.id, 'RECHAZAR')}
+                          disabled={!canApprove}
                           className="btn danger"
+                          title={!canApprove ? 'Su rol no permite rechazar solicitudes' : undefined}
                         >
                           Rechazar
                         </button>
@@ -1871,7 +1892,9 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
                     <div className="row-end">
                       <button
                         onClick={() => handleConfirmarDespacho(r.id)}
+                        disabled={!canDispatch}
                         className="btn dark"
+                        title={!canDispatch ? 'Su rol no permite despachar repuestos' : undefined}
                       >
                         Confirmar despacho
                       </button>
@@ -1969,9 +1992,10 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
 
           <button
             onClick={handleCerrarOrden}
-            disabled={!puedeCerrar || estadoOrden === 'Cerrada'}
+            disabled={!puedeCerrar || estadoOrden === 'Cerrada' || !canClose}
             className="btn amber"
             style={{ width: '100%', fontSize: 16 }}
+            title={!canClose ? 'Su rol no permite cerrar órdenes de servicio' : undefined}
           >
             {estadoOrden === 'Cerrada' ? 'Orden de Servicio Cerrada' : 'Cerrar orden de servicio'}
           </button>
