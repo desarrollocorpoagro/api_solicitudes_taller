@@ -9,20 +9,21 @@ import swaggerUi from 'swagger-ui-express';
 import { createServer as createViteServer } from 'vite';
 
 import { initDatabase } from './src/backend/config/database';
-import { initProfitDatabase } from './src/backend/config/profitDb';
+import { initProfitDatabase, initProfitMirrorSchema, seedProfitMirrorFromMain } from './src/backend/config/profitDb';
 import { seedInitialData } from './src/backend/models';
 import apiRoutes from './src/backend/routes';
 import swaggerDocument from './src/backend/config/swagger';
 import { logger, morganStream } from './src/backend/utils/logger';
 import { apiRateLimiter } from './src/backend/middlewares/rateLimiter.middleware';
 import { SyncService } from './src/backend/services/sync.service';
+import { MasterSyncService } from './src/backend/services/masterSync.service';
 import { runAllUnitTests } from './src/backend/tests/unitTests';
 
 dotenv.config();
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const basePort = Number(process.env.PORT || 3000);
   const isProduction = process.env.NODE_ENV === 'production';
 
   // Configurar trust proxy para proxies inversos (Cloud Run / Nginx / Vite)
@@ -87,6 +88,18 @@ async function startServer() {
     }
   });
 
+  // 4.1 Sitemap para Search Console
+  app.get('/sitemap.xml', (_req: Request, res: Response) => {
+    const sitemapPath = path.resolve(process.cwd(), 'public', 'sitemap.xml');
+    res.setHeader('Content-Type', 'application/xml');
+    res.sendFile(sitemapPath, (err) => {
+      if (err) {
+        logger.warn(`[Sitemap] Archivo no encontrado: ${sitemapPath}`);
+        res.status(404).send('Sitemap no disponible');
+      }
+    });
+  });
+
   // 5. Montar Rutas Modulares de la API
   app.use('/api/v1', apiRateLimiter, apiRoutes);
 
@@ -129,20 +142,42 @@ async function startServer() {
     await initDatabase();
     await seedInitialData();
     await initProfitDatabase();
+    // Asegurar que el espejo SQLite local (./data/profit_ad_trans.sqlite) tenga las tablas
+    // antes de iniciar la sincronización bidireccional. Sin esto, el primer ciclo fallaría
+    // al intentar INSERT en tablas inexistentes.
+    await initProfitMirrorSchema();
+    await seedProfitMirrorFromMain();
     // Iniciar motor de verificación periódica de conectividad y sincronización offline-first
     SyncService.startBackgroundSync(15000);
+    // Iniciar motor de sincronización bidireccional de datos maestros
+    // (mecánicos, vendedores, artículos y flota_ordenes_servicio).
+    // Ejecuta un ciclo inmediato de poblado/inserción y luego continúa cada 30s.
+    MasterSyncService.startBackgroundMasterSync(30000);
   } catch (dbErr: any) {
     logger.error(`[DatabaseInit] Error inicializando bases de datos: ${dbErr.message}`);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    logger.info(`========================================================`);
-    logger.info(`🚜 [San Luis Backend] Servidor Express activo en puerto ${PORT}`);
-    logger.info(`📚 Swagger UI disponible en: http://localhost:${PORT}/api-docs`);
-    logger.info(`📄 Especificación JSON en: http://localhost:${PORT}/api-docs-json`);
-    logger.info(`🏥 Healthcheck: http://localhost:${PORT}/health`);
-    logger.info(`========================================================`);
-  });
+  const listenOnPort = (port: number): void => {
+    const server = app.listen(port, '0.0.0.0', () => {
+      logger.info(`========================================================`);
+      logger.info(`🚜 [San Luis Backend] Servidor Express activo en puerto ${port}`);
+      logger.info(`📚 Swagger UI disponible en: http://localhost:${port}/api-docs`);
+      logger.info(`📄 Especificación JSON en: http://localhost:${port}/api-docs-json`);
+      logger.info(`🏥 Healthcheck: http://localhost:${port}/health`);
+      logger.info(`========================================================`);
+    });
+
+    server.on('error', (err: any) => {
+      if (err && err.code === 'EADDRINUSE') {
+        logger.warn(`[Server] Puerto ${port} ocupado; intentando ${port + 1}...`);
+        listenOnPort(port + 1);
+        return;
+      }
+      throw err;
+    });
+  };
+
+  listenOnPort(basePort);
 }
 
 startServer().catch((error) => {

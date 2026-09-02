@@ -2,7 +2,10 @@ import { Sequelize, Options } from 'sequelize';
 import path from 'path';
 import fs from 'fs';
 import { createRequire } from 'module';
+import dotenv from 'dotenv';
 import { logger } from '../utils/logger';
+
+dotenv.config();
 
 const require = createRequire(import.meta.url);
 const sqliteBridge = require('./sqliteBridge.cjs');
@@ -58,6 +61,18 @@ if (dbDialect === 'mssql') {
     dialectModule: sqliteBridge,
     storage: path.resolve(process.cwd(), dbStorage),
     logging: shouldLogSql ? (msg) => logger.debug(`[Sequelize SQLite] ${msg}`) : false,
+    pool: {
+      max: 5,
+      min: 0,
+      idle: 15000,
+      acquire: 30000,
+    },
+    retry: {
+      max: 3,
+      backoffBase: 500,
+      backoffExponent: 1.5,
+      match: [/database is locked/i, /SQLITE_BUSY/i, /SQLITE_LOCKED/i],
+    },
   };
 }
 

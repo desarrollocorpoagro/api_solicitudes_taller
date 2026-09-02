@@ -8,8 +8,7 @@ import {
   Terminal,
   Building2,
   LogOut,
-  Shield,
-  Layers
+  ChevronDown
 } from 'lucide-react';
 import LoginScreen from './components/LoginScreen';
 import TallerModule from './components/TallerModule';
@@ -53,7 +52,6 @@ export default function App() {
   const handleSwitchCompany = async (compId: string) => {
     setLoading(true);
     try {
-      // Re-autenticar o seleccionar empresa
       const resLogin = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,8 +121,17 @@ export default function App() {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
+  const navItems = [
+    { id: 'taller', label: 'Taller San Luis', icon: Wrench },
+    { id: 'usuarios', label: 'Gestión Usuarios (RBAC)', icon: Users },
+    { id: 'swagger', label: 'Swagger API Explorer', icon: BookOpen },
+    { id: 'notificaciones', label: 'Notificaciones & Push', icon: Bell },
+    { id: 'multimedia', label: 'Archivos Multimedia', icon: ImageIcon },
+    { id: 'pruebas', label: 'Consola Pruebas Unitarias', icon: Terminal },
+  ] as const;
+
   return (
-    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col font-['Rubik']">
+    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col font-['Rubik'] antialiased selection:bg-[var(--lime-soft)] selection:text-[var(--navy)]">
       {/* Top Header Corporativo Grupo San Luis */}
       <header className="topbar">
         <div className="topbar-in">
@@ -133,77 +140,76 @@ export default function App() {
           </div>
 
           {/* Selector de Tenant / Empresa Activa & Usuario & Sync & Logout */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <SyncStatusBadge token={token} />
 
-            <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-[var(--r)] border border-white/20">
-              <Building2 className="w-4 h-4 text-[var(--lime)]" />
-              <div>
-                <span className="block text-[9px] text-[#9DB8D4] uppercase font-semibold leading-none">Empresa Activa</span>
-                <select
-                  value={activeCompany?.id}
-                  onChange={(e) => handleSwitchCompany(e.target.value)}
-                  className="bg-transparent text-white font-semibold text-xs focus:outline-none cursor-pointer pr-2 border-0 p-0 min-h-0"
-                >
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id} className="text-[#12232E]">
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+            {/* Selector de Empresa */}
+            <div className="flex items-center gap-2 bg-white/10 hover:bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-[var(--r)] border border-white/20 transition-colors">
+              <Building2 className="w-4 h-4 text-[var(--lime)] shrink-0" />
+              <div className="relative flex items-center pr-4">
+                <div>
+                  <span className="block text-[9px] text-[#9DB8D4] uppercase font-semibold leading-none tracking-wider">Empresa Activa</span>
+                  <select
+                    value={activeCompany?.id}
+                    onChange={(e) => handleSwitchCompany(e.target.value)}
+                    disabled={loading}
+                    className="bg-transparent text-white font-semibold text-xs focus:outline-none cursor-pointer border-0 p-0 min-h-0 appearance-none leading-tight"
+                  >
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id} className="text-[#12232E] bg-white">
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-white/70 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
 
             {/* Badge de Usuario */}
-            <div className="flex items-center gap-2 text-xs bg-white/10 border border-white/20 px-3 py-1.5 rounded-[var(--r)]">
-              <div className="w-6 h-6 rounded-full bg-[var(--lime)] text-[var(--navy)] font-bold flex items-center justify-center text-xs">
+            <div className="flex items-center gap-2 text-xs bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-[var(--r)]">
+              <div className="w-6 h-6 rounded-full bg-[var(--lime)] text-[var(--navy)] font-bold flex items-center justify-center text-xs shrink-0 shadow-sm">
                 {user?.fullName?.charAt(0) || 'U'}
               </div>
-              <div>
-                <span className="block font-semibold text-white leading-none text-xs">{user?.fullName || 'Usuario'}</span>
-                <span className="text-[10px] text-[var(--lime)] font-mono">{user?.role || 'OPERADOR'}</span>
+              <div className="hidden sm:block">
+                <span className="block font-semibold text-white leading-tight text-xs">{user?.fullName || 'Usuario'}</span>
+                <span className="text-[10px] text-[var(--lime)] font-mono leading-none block">{user?.role || 'OPERADOR'}</span>
               </div>
             </div>
 
             {/* Botón Cerrar Sesión */}
             <button
               onClick={handleLogout}
-              className="flex items-center gap-1.5 text-xs text-rose-200 hover:text-white bg-rose-500/20 hover:bg-rose-600/40 border border-rose-400/30 px-3 py-2 rounded-[var(--r)] transition-all cursor-pointer"
+              className="flex items-center gap-1.5 text-xs text-rose-200 hover:text-white bg-rose-500/20 hover:bg-rose-600/40 active:scale-95 border border-rose-400/30 px-3 py-2 rounded-[var(--r)] transition-all cursor-pointer"
               title="Cerrar sesión y volver a la pantalla de login"
             >
               <LogOut className="w-3.5 h-3.5 text-rose-300" />
-              <span className="font-semibold">Cerrar Sesión</span>
+              <span className="font-semibold hidden md:inline">Cerrar Sesión</span>
             </button>
           </div>
         </div>
 
         {/* Barra de Navegación de Módulos */}
-        <div className="tabs">
+        <nav className="tabs" aria-label="Navegación principal de módulos">
           <div className="tabs-in">
-            {[
-              { id: 'taller', label: 'Taller San Luis', icon: Wrench },
-              { id: 'usuarios', label: 'Gestión Usuarios (RBAC)', icon: Users },
-              { id: 'swagger', label: 'Swagger API Explorer', icon: BookOpen },
-              { id: 'notificaciones', label: 'Notificaciones & Push', icon: Bell },
-              { id: 'multimedia', label: 'Archivos Multimedia', icon: ImageIcon },
-              { id: 'pruebas', label: 'Consola Pruebas Unitarias', icon: Terminal },
-            ].map((nav) => {
+            {navItems.map((nav) => {
               const Icon = nav.icon;
               const isActive = activeNav === nav.id;
               return (
                 <button
                   key={nav.id}
-                  onClick={() => setActiveNav(nav.id as any)}
-                  className={`tab ${isActive ? 'active' : ''}`}
+                  onClick={() => setActiveNav(nav.id)}
+                  className={`tab group ${isActive ? 'active' : ''}`}
                   aria-selected={isActive}
+                  role="tab"
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-[var(--navy)]' : 'text-[var(--slate)]'}`} />
-                  {nav.label}
+                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-[var(--navy)]' : 'text-[var(--slate)] group-hover:text-[var(--ink)]'}`} />
+                  <span>{nav.label}</span>
                 </button>
               );
             })}
           </div>
-        </div>
+        </nav>
       </header>
 
       {/* Simulador y Selector Rápido de Roles para Pruebas */}
@@ -215,20 +221,22 @@ export default function App() {
       />
 
       {/* Contenido Principal */}
-      <main className="flex-1 w-full max-w-[1120px] mx-auto p-4 sm:p-6">
-        {activeNav === 'taller' && <TallerModule token={token} activeCompany={activeCompany} currentUser={user} />}
-        {activeNav === 'usuarios' && <UserManagementModule token={token} currentUser={user} />}
-        {activeNav === 'swagger' && <SwaggerModule />}
-        {activeNav === 'notificaciones' && <NotificationsModule />}
-        {activeNav === 'multimedia' && <MultimediaModule />}
-        {activeNav === 'pruebas' && <TestConsoleModule />}
+      <main className="wrap flex-1">
+        <div key={activeNav} className="module-fade">
+          {activeNav === 'taller' && <TallerModule token={token} activeCompany={activeCompany} currentUser={user} />}
+          {activeNav === 'usuarios' && <UserManagementModule token={token} currentUser={user} />}
+          {activeNav === 'swagger' && <SwaggerModule />}
+          {activeNav === 'notificaciones' && <NotificationsModule />}
+          {activeNav === 'multimedia' && <MultimediaModule />}
+          {activeNav === 'pruebas' && <TestConsoleModule />}
+        </div>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-[var(--line)] text-[var(--slate)] text-xs py-4">
-        <div className="max-w-[1120px] mx-auto px-4 flex flex-wrap justify-between items-center gap-2">
-          <span>© 2026 Grupo San Luis — Plataforma Backend Multi-Tenant (MSSQL & Sequelize ORM)</span>
-          <span className="font-mono text-[11px] text-[var(--slate)]">Identidad Corporativa San Luis • OpenAPI 3.0.3</span>
+      {/* Footer Fijo en la Base */}
+      <footer className="bg-white border-t border-[var(--line)] text-[var(--slate)] text-xs py-4 mt-auto">
+        <div className="wrap !padding-0 flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left !pb-0">
+          <span>© 2026 Grupo San Luis )</span>
+          <span className="font-mono text-[11px] text-[var(--slate)]"></span>
         </div>
       </footer>
     </div>

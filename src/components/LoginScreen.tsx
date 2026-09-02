@@ -164,8 +164,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           }}
         >
           <SanLuisLogo variant="inverse" height={44} />
+          {/* <img
+            src="./assets/logo-sanluis.png"
+            alt="Logo San Luis"
+            style={{ width: 120, height: 'auto' }}
+          /> */}
           <p style={{ fontSize: 13, color: '#9DB8D4', margin: '4px 0 0', letterSpacing: '.3px' }}>
-            Portal Integral de Taller y Gestión de Flota Multi-Tenant
+            Portal Integral de Taller y Gestión de Flota 
           </p>
         </div>
 
@@ -541,7 +546,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
         {/* Pie de pantalla */}
         <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: 'var(--slate)' }}>
-          © 2026 Grupo San Luis • Sistema Integral Multi-Tenant con Auditoría Profit Plus
+          © 2026 Grupo San Luis • 
         </div>
       </div>
     </div>

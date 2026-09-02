@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { ProfitFlotaController } from '../controllers/profitFlota.controller';
+import { MasterSyncController } from '../controllers/masterSync.controller';
 import { validateJoi } from '../middlewares/validate.middleware';
 import {
   createProfitOrdenSchema,
@@ -17,6 +18,26 @@ const router = Router();
  * @desc Comprobar estado de la conexión MSSQL con servidor Profit (SRVBDPROFITBK / AD_TRANS)
  */
 router.get('/conexion/status', ProfitFlotaController.testConnection);
+
+/**
+ * @route POST /api/v1/profit/sync/master
+ * @desc Ejecutar sincronización bidireccional de datos maestros (mecánicos, vendedores, artículos)
+ *       entre la BD local y la BD remota MSSQL. Cuenta registros en ambos extremos, compara e
+ *       inserta los faltantes en cada lado para mantener consistencia.
+ */
+router.post('/sync/master', MasterSyncController.runMasterSync);
+
+/**
+ * @route GET /api/v1/profit/sync/master/status
+ * @desc Estado del motor de sincronización maestra (en ejecución / último reporte).
+ */
+router.get('/sync/master/status', MasterSyncController.getStatus);
+
+/**
+ * @route GET /api/v1/profit/sync/master/last-report
+ * @desc Devuelve el último reporte generado por la sincronización bidireccional maestra.
+ */
+router.get('/sync/master/last-report', MasterSyncController.getLastReport);
 
 /**
  * @route GET /api/v1/profit/vendedores
