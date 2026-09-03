@@ -12,6 +12,7 @@ services:
       - "4000:4000"
     environment:
       - PORT=4000
+      - FRONTEND_PORT=4100
       - NODE_ENV=production
       - JWT_SECRET=development-secret-keys-for-sanluis-app-2026
       - JWT_PREAUTH_SECRET=development-preauth-secret-keys-for-sanluis-app-2026
@@ -23,7 +24,8 @@ services:
       - DB_PASSWORD=SanLuisPassword2026!
       - UPLOAD_DIR=/app/data/uploads
       - STORAGE_DRIVER=local
-      - CORS_ORIGIN=*
+      - CORS_ORIGIN=http://localhost:4100
+      - APP_URL=http://localhost:4000
       - SESSION_TTL=8h
       - PREAUTH_TTL=15m
     volumes:

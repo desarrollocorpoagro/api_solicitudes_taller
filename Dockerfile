@@ -24,7 +24,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=4000
 
 # Instalar dependencias de producción mínimas
 COPY package*.json ./
@@ -40,7 +40,7 @@ RUN mkdir -p /app/data/uploads && chown -R node:node /app
 
 USER node
 
-EXPOSE 3000
+EXPOSE 4000
 
 # Comando de inicio del servidor backend compilado
 CMD ["node", "dist/server.cjs"]

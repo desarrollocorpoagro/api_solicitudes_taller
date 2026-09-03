@@ -9,7 +9,7 @@ export class StorageService {
    */
   static async saveFile(file: Express.Multer.File, ordenId?: string, tipo: string = 'foto_sintoma') {
     const storageDriver = (process.env.STORAGE_DRIVER || 'local').toLowerCase() as 'local' | 's3' | 'gcs';
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const appUrl = process.env.APP_URL || 'http://localhost:4000';
     
     let publicUrl = `${appUrl}/uploads/${file.filename}`;
 

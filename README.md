@@ -39,7 +39,8 @@ cp .env.example .env
 ```
 
 Variables clave configuradas:
-- `PORT=3000`
+- `PORT=4000` (Backend Express)
+- `FRONTEND_PORT=4100` (Vite dev server)
 - `DB_DIALECT=mssql` (o `sqlite` para pruebas locales)
 - `DB_HOST=localhost`
 - `DB_PORT=1433`
@@ -59,7 +60,7 @@ npm install
 ```bash
 npm run dev
 ```
-El servidor arrancará en **http://localhost:3000** con recarga en vivo (`tsx`).
+El servidor backend arrancará en **http://localhost:4000** y el frontend Vite (con HMR y proxy automático a la API) en **http://localhost:4100**. Recarga en vivo mediante `tsx`.
 
 ---
 
@@ -96,8 +97,8 @@ También es posible ejecutar las pruebas en tiempo real mediante el endpoint:
 ## 📚 Documentación Interactiva de la API (Swagger UI)
 
 Una vez iniciado el servidor, acceda a la documentación visual interactiva:
-- **Swagger UI:** `http://localhost:3000/api-docs`
-- **JSON OpenAPI 3.0:** `http://localhost:3000/api-docs-json`
+- **Swagger UI:** `http://localhost:4000/api-docs`
+- **JSON OpenAPI 3.0:** `http://localhost:4000/api-docs-json`
 - **Catálogo Markdown:** Consulte el archivo [`ENDPOINTS.md`](./ENDPOINTS.md).
 
 ---
