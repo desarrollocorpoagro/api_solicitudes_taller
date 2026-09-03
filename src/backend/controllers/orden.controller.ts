@@ -325,11 +325,13 @@ export class OrdenController {
       const unidad = await FlotaVehicular.findOne({ where: { placa: orden.placa } });
 
       // Validar pertenencia a la empresa activa
+      // Bypass: ADMIN global puede consultar órdenes de cualquier tenant.
       const tenant = await getTenantContext(req);
-      if (tenant) {
+      const isAdminGlobal = req.user?.role?.toUpperCase() === 'ADMIN';
+      if (tenant && !isAdminGlobal) {
         const matchesTenantId = orden.tenantId && orden.tenantId === tenant.companyId;
         const matchesVehicleCompany = unidad && (unidad.companyId === tenant.companyId || unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase());
-        
+
         if (!matchesTenantId && !matchesVehicleCompany) {
           return res.status(403).json({
             success: false,
@@ -381,8 +383,10 @@ export class OrdenController {
       const unidad = await FlotaVehicular.findOne({ where: { placa: orden.placa } });
 
       // Validar aislamiento multi-tenant
+      // Bypass: ADMIN global puede cerrar órdenes de cualquier tenant.
       const tenant = await getTenantContext(req);
-      if (tenant) {
+      const isAdminGlobal = req.user?.role?.toUpperCase() === 'ADMIN';
+      if (tenant && !isAdminGlobal) {
         const matchesTenantId = orden.tenantId && orden.tenantId === tenant.companyId;
         const matchesVehicleCompany = unidad && (unidad.companyId === tenant.companyId || unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase());
         if (!matchesTenantId && !matchesVehicleCompany) {
@@ -499,8 +503,10 @@ export class OrdenController {
         return res.status(404).json({ success: false, error: 'Orden de servicio no encontrada.' });
       }
 
+      // Bypass: ADMIN global puede modificar órdenes de cualquier tenant.
       const tenant = await getTenantContext(req);
-      if (tenant && orden.tenantId && orden.tenantId !== tenant.companyId) {
+      const isAdminGlobal = req.user?.role?.toUpperCase() === 'ADMIN';
+      if (tenant && !isAdminGlobal && orden.tenantId && orden.tenantId !== tenant.companyId) {
         return res.status(403).json({
           success: false,
           error: `Acceso denegado: No puede modificar la orden ${id} desde otra empresa.`,

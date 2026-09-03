@@ -4,43 +4,26 @@ import { authenticateToken, requireRoles } from '../middlewares/auth.middleware'
 
 const router = Router();
 
+// Autenticación obligatoria para TODAS las rutas de este módulo.
 router.use(authenticateToken('FULL_AUTH'));
-router.use(requireRoles(['ADMIN']));
-
-/**
- * @route GET /api/v1/roles-permissions
- * @desc Matriz paginada de permisos por roles
- */
-router.get('/', RolePermissionController.getAllRolePermissions);
 
 /**
  * @route GET /api/v1/roles-permissions/role/:role
- * @desc Permisos de un rol específico
+ * @desc Permisos de un rol específico — accesible a cualquier usuario autenticado.
+ *       Lo usa el frontend (App.tsx) tras login para filtrar el menú según el rol.
  */
 router.get('/role/:role', RolePermissionController.getPermissionsByRole);
 
 /**
- * @route PUT /api/v1/roles-permissions/role/:role
- * @desc Actualizar en lote los permisos de un rol
- */
-router.put('/role/:role', RolePermissionController.bulkUpdateRole);
-
-/**
- * @route PUT /api/v1/roles-permissions/role/:role/module
- * @desc Actualizar permisos de un rol para un módulo individual
- */
-router.put('/role/:role/module', RolePermissionController.updateRolePermissions);
-
-/**
  * @route GET /api/v1/roles-permissions/user/:userId
- * @desc Permisos y excepciones personalizadas por usuario
+ * @desc Permisos personalizados de un usuario — accesible a cualquier usuario autenticado.
  */
 router.get('/user/:userId', RolePermissionController.getUserPermissions);
 
-/**
- * @route PUT /api/v1/roles-permissions/user/:userId
- * @desc Guardar excepciones de permisos para un usuario
- */
-router.put('/user/:userId', RolePermissionController.updateUserPermissions);
+// Las siguientes rutas requieren rol ADMIN (operaciones de administración global):
+router.get('/', requireRoles(['ADMIN']), RolePermissionController.getAllRolePermissions);
+router.put('/role/:role', requireRoles(['ADMIN']), RolePermissionController.bulkUpdateRole);
+router.put('/role/:role/module', requireRoles(['ADMIN']), RolePermissionController.updateRolePermissions);
+router.put('/user/:userId', requireRoles(['ADMIN']), RolePermissionController.updateUserPermissions);
 
 export default router;

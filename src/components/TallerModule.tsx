@@ -29,6 +29,8 @@ import {
 import { OrdenAuditHistory } from './OrdenAuditHistory';
 import SanLuisLogo from './SanLuisLogo';
 
+type TallerTabId = 'apertura' | 'areas' | 'repuestos' | 'externos' | 'aprob' | 'almacen' | 'cierre' | 'auditoria';
+
 interface MecanicoProfitItem {
   codigo: string;
   nombre: string;
@@ -95,8 +97,173 @@ interface SolicitudExt {
   estadoAprobacion: 'Pendiente' | 'Aprobada' | 'Rechazada';
 }
 
-export const TallerModule: React.FC<{ token: string; activeCompany: any; currentUser?: any }> = ({ token, activeCompany, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'apertura' | 'areas' | 'repuestos' | 'externos' | 'aprob' | 'almacen' | 'cierre' | 'auditoria'>('apertura');
+// ───────────────────────────────────────────────────────────────────────────────
+// Autocomplete reutilizable: input con dropdown filtrable.
+// Acepta una lista de opciones { value, label, subLabel? } y notifica onChange
+// cuando el usuario selecciona un valor.
+// ───────────────────────────────────────────────────────────────────────────────
+interface AutocompleteOption {
+  value: string;
+  label: string;
+  subLabel?: string;
+}
+
+const Autocomplete: React.FC<{
+  value: string;
+  onChange: (v: string) => void;
+  options: AutocompleteOption[];
+  placeholder?: string;
+  emptyMessage?: string;
+}> = ({ value, onChange, options, placeholder, emptyMessage }) => {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+
+  // Texto mostrado en el input: si hay selección previa, mostrar su label.
+  // Si el usuario está escribiendo, mostrar lo que escribe.
+  const selectedOption = options.find((o) => o.value === value);
+  const inputText = open ? query : selectedOption?.label || query || '';
+
+  const filtered = query.trim()
+    ? options.filter((o) => {
+        const t = query.toLowerCase();
+        return (
+          o.label.toLowerCase().includes(t) ||
+          (o.subLabel && o.subLabel.toLowerCase().includes(t)) ||
+          o.value.toLowerCase().includes(t)
+        );
+      })
+    : options;
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <input
+          type="text"
+          value={inputText}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            // Si el usuario edita el texto, limpiar la selección interna.
+            if (selectedOption && e.target.value !== selectedOption.label) {
+              onChange('');
+            }
+          }}
+          onFocus={() => {
+            setQuery('');
+            setOpen(true);
+          }}
+          onBlur={() => {
+            // Delay para permitir click en opciones antes de cerrar.
+            setTimeout(() => setOpen(false), 150);
+          }}
+          placeholder={placeholder}
+          style={{ paddingRight: 32, width: '100%', height: 42 }}
+        />
+        {value && !open && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('');
+              onChange('');
+            }}
+            style={{
+              position: 'absolute',
+              right: 6,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--slate)',
+              padding: 4,
+            }}
+            title="Limpiar selección"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 50,
+            background: '#ffffff',
+            border: '1px solid var(--line)',
+            borderRadius: 6,
+            boxShadow: '0 8px 24px -8px rgba(15,23,42,0.18)',
+            maxHeight: 260,
+            overflowY: 'auto',
+            marginTop: 4,
+          }}
+        >
+          {filtered.length === 0 ? (
+            <div
+              style={{
+                padding: 12,
+                textAlign: 'center',
+                fontSize: 12,
+                color: 'var(--slate)',
+              }}
+            >
+              {emptyMessage || 'Sin resultados.'}
+            </div>
+          ) : (
+            filtered.map((o) => {
+              const isSelected = o.value === value;
+              return (
+                <div
+                  key={o.value}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onChange(o.value);
+                    setQuery('');
+                    setOpen(false);
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    background: isSelected ? '#f0fdf4' : 'transparent',
+                    borderBottom: '1px solid #f1f5f9',
+                    fontSize: 13,
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = isSelected
+                      ? '#f0fdf4'
+                      : 'var(--paper)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = isSelected
+                      ? '#f0fdf4'
+                      : 'transparent';
+                  }}
+                >
+                  <div style={{ fontWeight: isSelected ? 700 : 500 }}>{o.label}</div>
+                  {o.subLabel && (
+                    <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 2 }}>
+                      {o.subLabel}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const TallerModule: React.FC<{
+  token: string;
+  activeCompany: any;
+  currentUser?: any;
+  initialTab?: TallerTabId;
+}> = ({ token, activeCompany, currentUser, initialTab }) => {
+  const [activeTab, setActiveTab] = useState<TallerTabId>(initialTab ?? 'apertura');
 
   // Listas de la empresa activa
   const [companyFleet, setCompanyFleet] = useState<Unidad[]>([]);
@@ -191,6 +358,14 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
       }
     }
   }, [currentUser?.role]);
+
+  // Sincronizar pestaña interna cuando el menú superior cambia la fase seleccionada
+  useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTab]);
 
   const cargarMecanicos = async () => {
     setMecanicosLoading(true);
@@ -1332,41 +1507,43 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
           <div className="grid g3" style={{ marginBottom: 14 }}>
             <label className="f">
               <span className="req">Área</span>
-              <select
+              <Autocomplete
                 value={formArea.area}
-                onChange={(e) => setFormArea({ ...formArea, area: e.target.value })}
-              >
-                <option>Mtto preventivo</option>
-                <option>Reparaciones mayores</option>
-                <option>Mtto correctivo</option>
-                <option>Metalmecánica</option>
-                <option>Latonería y pintura</option>
-                <option>Cauchera</option>
-                <option>Lavado</option>
-              </select>
+                onChange={(v) => setFormArea({ ...formArea, area: v })}
+                placeholder="Buscar área..."
+                options={[
+                  'Mtto preventivo',
+                  'Reparaciones mayores',
+                  'Mtto correctivo',
+                  'Metalmecánica',
+                  'Latonería y pintura',
+                  'Cauchera',
+                  'Lavado',
+                ].map((a) => ({ value: a, label: a }))}
+              />
             </label>
             <label className="f">
               <span className="req">Mecánico Asignado</span>
-              <select
+              <Autocomplete
                 value={formArea.mecanico}
-                onChange={(e) => setFormArea({ ...formArea, mecanico: e.target.value })}
-              >
-                {mecanicosList.length > 0 ? (
-                  mecanicosList.map((m) => (
-                    <option key={m.codigo} value={m.nombre}>
-                      [{m.codigo}] {m.nombre} {m.cargo ? `(${m.cargo})` : ''}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option>José Gregorio Hernández Ramírez</option>
-                    <option>Luis Márquez</option>
-                    <option>Ana Peña</option>
-                    <option>Carlos Ojeda</option>
-                    <option>Miguel Sanz</option>
-                  </>
+                onChange={(v) => setFormArea({ ...formArea, mecanico: v })}
+                placeholder="Buscar mecánico por nombre o código..."
+                options={(
+                  mecanicosList.length > 0
+                    ? mecanicosList.map((m) => ({
+                        value: m.nombre,
+                        label: `${m.nombre}${m.cargo ? ` — ${m.cargo}` : ''}`,
+                        subLabel: `[${m.codigo}]`,
+                      }))
+                    : [
+                        { value: 'José Gregorio Hernández Ramírez', label: 'José Gregorio Hernández Ramírez', subLabel: '[V11587399]' },
+                        { value: 'Luis Márquez', label: 'Luis Márquez' },
+                        { value: 'Ana Peña', label: 'Ana Peña' },
+                        { value: 'Carlos Ojeda', label: 'Carlos Ojeda' },
+                        { value: 'Miguel Sanz', label: 'Miguel Sanz' },
+                      ]
                 )}
-              </select>
+              />
             </label>
             <label className="f">
               <span>Horas estimadas</span>
@@ -1464,22 +1641,31 @@ export const TallerModule: React.FC<{ token: string; activeCompany: any; current
           <div className="grid g2" style={{ marginBottom: 14 }}>
             <label className="f">
               <span className="req">Orden de área</span>
-              <select
+              <Autocomplete
                 value={formRep.otId}
-                onChange={(e) => setFormRep({ ...formRep, otId: e.target.value })}
-              >
-                {ots.map(o => <option key={o.id} value={o.id}>{o.id} — {o.area}</option>)}
-              </select>
+                onChange={(v) => setFormRep({ ...formRep, otId: v })}
+                placeholder="Buscar orden de área..."
+                options={ots.map((o) => ({
+                  value: o.id,
+                  label: `${o.id} — ${o.area}`,
+                  subLabel: `Mecánico: ${o.mecanico}${o.estado ? ` · ${o.estado}` : ''}`,
+                }))}
+                emptyMessage="Aún no hay órdenes de área abiertas."
+              />
             </label>
             <label className="f">
               <span className="req">Repuesto</span>
-              <select
+              <Autocomplete
                 value={formRep.cod}
-                onChange={(e) => setFormRep({ ...formRep, cod: e.target.value })}
-                className="mono"
-              >
-                {catalogo.map(c => <option key={c.cod} value={c.cod}>{c.cod} — {c.desc} (Stock: {c.stock} | ${c.costo})</option>)}
-              </select>
+                onChange={(v) => setFormRep({ ...formRep, cod: v })}
+                placeholder="Buscar repuesto por código o descripción..."
+                options={catalogo.map((c) => ({
+                  value: c.cod,
+                  label: `${c.cod} — ${c.desc}`,
+                  subLabel: `Stock: ${c.stock} · $${Number(c.costo || 0).toFixed(2)}`,
+                }))}
+                emptyMessage="No hay repuestos en el catálogo."
+              />
             </label>
           </div>
 

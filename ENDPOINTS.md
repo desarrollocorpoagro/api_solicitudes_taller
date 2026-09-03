@@ -50,7 +50,7 @@ Documentación técnica y descriptiva de los endpoints disponibles en la API del
     "companies": [
       {
         "id": "11111111-1111-1111-1111-111111111111",
-        "name": "Transporte Andina C.A.",
+        "name": "TRANSPORTE SAN LUIS DE LARA, C.A.",
         "taxId": "J-30219482-1",
         "role": "ADMIN"
       }
@@ -77,7 +77,7 @@ Documentación técnica y descriptiva de los endpoints disponibles en la API del
     "token": "eyJhbGciOi...",
     "activeCompany": {
       "id": "11111111-1111-1111-1111-111111111111",
-      "name": "Transporte Andina C.A.",
+      "name": "TRANSPORTE SAN LUIS DE LARA, C.A.",
       "taxId": "J-30219482-1",
       "role": "ADMIN",
       "permissions": [...]

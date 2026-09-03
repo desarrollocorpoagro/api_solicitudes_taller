@@ -80,8 +80,10 @@ export {
  */
 export const seedInitialData = async () => {
   try {
-    // Sincronizar tablas
-    await sequelize.sync({ alter: true });
+    // Sincronizar tablas (sin alter para evitar el bug SQLite "constraint failed"
+    // al rehacer tablas con índices UNIQUE sobre role_permissions).
+    // Para evolucionar el esquema en desarrollo: borrar ./data/sanluis.sqlite.
+    await sequelize.sync();
 
     // 1. Semilla de Empresas (Tenants)
     const companyCount = await Company.count();
@@ -90,8 +92,8 @@ export const seedInitialData = async () => {
     if (companyCount === 0) {
       comp1 = await Company.create({
         id: '11111111-1111-1111-1111-111111111111',
-        name: 'Transporte Andina C.A.',
-        taxId: 'J-30219482-1',
+        name: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
+        taxId: 'J-30516192-5',
         email: 'contacto@transporteandina.com',
         phone: '+58 274 2441122',
         isActive: true,
@@ -99,24 +101,17 @@ export const seedInitialData = async () => {
 
       comp2 = await Company.create({
         id: '22222222-2222-2222-2222-222222222222',
-        name: 'Agro Llanos C.A.',
-        taxId: 'J-11409281-3',
+        name: 'SAN LUIS TRANSPORTE, C.A.',
+        taxId: 'J-50178032-3',
         email: 'operaciones@agrollanos.com',
         phone: '+58 247 3349911',
         isActive: true,
       });
 
-      comp3 = await Company.create({
-        id: '33333333-3333-3333-3333-333333333333',
-        name: 'Distribuidora Centro C.A.',
-        taxId: 'J-55028471-0',
-        email: 'logistica@distribuidoracentro.com',
-        phone: '+58 241 8712345',
-        isActive: true,
-      });
+      
       logger.info('[Seed] Empresas creadas exitosamente.');
     } else {
-      [comp1, comp2, comp3] = (await Company.findAll({ limit: 3 })) as [Company, Company, Company];
+      [comp1, comp2] = (await Company.findAll({ limit: 3 })) as [Company, Company];
     }
 
     // 2. Semilla de Usuarios y asignaciones de empresa
@@ -137,7 +132,7 @@ export const seedInitialData = async () => {
         phone: '+58 412 1112233',
         role: 'ADMIN',
         isActive: true,
-        companies: [comp1?.id, comp2?.id, comp3?.id],
+        companies: [comp1?.id, comp2?.id],
         permissions: allPermissions,
       },
       {
@@ -148,7 +143,7 @@ export const seedInitialData = async () => {
         phone: '+58 414 2223344',
         role: 'GERENTE_TALLER',
         isActive: true,
-        companies: [comp1?.id, comp2?.id],
+        companies: [comp1?.id],
         permissions: allPermissions,
       },
       {
@@ -159,7 +154,7 @@ export const seedInitialData = async () => {
         phone: '+58 414 7778899',
         role: 'SUPERVISOR',
         isActive: true,
-        companies: [comp1?.id, comp2?.id],
+        companies: [comp1?.id],
         permissions: [
           { module: 'taller', actions: ['read', 'create', 'update', 'approve'] },
           { module: 'fleet', actions: ['read', 'update'] },
@@ -174,7 +169,7 @@ export const seedInitialData = async () => {
         phone: '+58 416 3334455',
         role: 'RESPONSABLE_FLOTA',
         isActive: true,
-        companies: [comp1?.id, comp2?.id, comp3?.id],
+        companies: [comp1?.id],
         permissions: [
           { module: 'fleet', actions: ['read', 'create', 'update'] },
           { module: 'taller', actions: ['read', 'create'] },
@@ -203,7 +198,7 @@ export const seedInitialData = async () => {
         phone: '+58 412 8889900',
         role: 'MECANICO',
         isActive: true,
-        companies: [comp1?.id, comp2?.id],
+        companies: [comp1?.id],
         permissions: [
           { module: 'taller', actions: ['read', 'update'] },
           { module: 'inventory', actions: ['read', 'create'] },
@@ -217,7 +212,7 @@ export const seedInitialData = async () => {
         phone: '+58 412 5556677',
         role: 'ALMACENISTA',
         isActive: true,
-        companies: [comp1?.id, comp2?.id, comp3?.id],
+        companies: [comp1?.id],
         permissions: [
           { module: 'inventory', actions: ['read', 'dispatch', 'requisition'] },
           { module: 'taller', actions: ['read'] },
@@ -232,7 +227,7 @@ export const seedInitialData = async () => {
         phone: '+58 414 9991122',
         role: 'AUDITOR',
         isActive: true,
-        companies: [comp1?.id, comp2?.id, comp3?.id],
+        companies: [comp1?.id],
         permissions: [
           { module: 'taller', actions: ['read'] },
           { module: 'fleet', actions: ['read'] },
@@ -248,7 +243,7 @@ export const seedInitialData = async () => {
         phone: '+58 416 2223344',
         role: 'SOLICITANTE',
         isActive: true,
-        companies: [comp1?.id, comp2?.id],
+        companies: [comp1?.id],
         permissions: [
           { module: 'taller', actions: ['read', 'create'] },
           { module: 'fleet', actions: ['read'] },
@@ -262,7 +257,7 @@ export const seedInitialData = async () => {
         phone: '+58 424 5556677',
         role: 'OPERADOR',
         isActive: true,
-        companies: [comp1?.id, comp2?.id, comp3?.id],
+        companies: [comp1?.id],
         permissions: [
           { module: 'taller', actions: ['read'] },
           { module: 'fleet', actions: ['read'] },
@@ -309,14 +304,14 @@ export const seedInitialData = async () => {
     const flotaCount = await FlotaVehicular.count();
     if (flotaCount === 0) {
       await FlotaVehicular.bulkCreate([
-        // Empresa 1: Transporte Andina C.A.
+        // Empresa 1: TRANSPORTE SAN LUIS DE LARA, C.A.
         {
           placa: 'A12BC3D',
           companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
           marca: 'Chevrolet NPR',
           anio: 2019,
           tipo: 'Camión 5t',
-          empresa: 'Transporte Andina C.A.',
+          empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
           cc: '3021',
           km: 184320,
           qrCode: 'SL-VEH-A12BC3D-3021',
@@ -330,7 +325,7 @@ export const seedInitialData = async () => {
           marca: 'Mack Granite',
           anio: 2018,
           tipo: 'Chuto Pesado 30t',
-          empresa: 'Transporte Andina C.A.',
+          empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
           cc: '3022',
           km: 310450,
           qrCode: 'SL-VEH-A99ZZ11-3022',
@@ -341,20 +336,20 @@ export const seedInitialData = async () => {
           marca: 'Ford Cargo 1721',
           anio: 2020,
           tipo: 'Camión Plataforma',
-          empresa: 'Transporte Andina C.A.',
+          empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
           cc: '3023',
           km: 215600,
           qrCode: 'SL-VEH-A44TR88-3023',
         },
 
-        // Empresa 2: Agro Llanos C.A.
+        // Empresa 2: SAN LUIS TRANSPORTE, C.A.
         {
           placa: 'B77XY9Z',
           companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
           marca: 'Toyota Hilux 4x4',
           anio: 2021,
           tipo: 'Pick-up Campo',
-          empresa: 'Agro Llanos C.A.',
+          empresa: 'SAN LUIS TRANSPORTE, C.A.',
           cc: '1140',
           km: 96540,
           qrCode: 'SL-VEH-B77XY9Z-1140',
@@ -368,7 +363,7 @@ export const seedInitialData = async () => {
           marca: 'John Deere 6125J',
           anio: 2022,
           tipo: 'Tractor Agrícola',
-          empresa: 'Agro Llanos C.A.',
+          empresa: 'SAN LUIS TRANSPORTE, C.A.',
           cc: '1141',
           km: 4520,
           qrCode: 'SL-VEH-B22AG55-1141',
@@ -379,46 +374,13 @@ export const seedInitialData = async () => {
           marca: 'Chevrolet D-Max',
           anio: 2020,
           tipo: 'Pick-up Supervisión',
-          empresa: 'Agro Llanos C.A.',
+          empresa: 'SAN LUIS TRANSPORTE, C.A.',
           cc: '1142',
           km: 142100,
           qrCode: 'SL-VEH-B88CC12-1142',
         },
 
-        // Empresa 3: Distribuidora Centro C.A.
-        {
-          placa: 'C45MN8P',
-          companyId: comp3 ? comp3.id : '33333333-3333-3333-3333-333333333333',
-          marca: 'Mack Granite',
-          anio: 2016,
-          tipo: 'Chuto Logístico',
-          empresa: 'Distribuidora Centro C.A.',
-          cc: '5502',
-          km: 412780,
-          qrCode: 'SL-VEH-C45MN8P-5502',
-        },
-        {
-          placa: 'C90DC33',
-          companyId: comp3 ? comp3.id : '33333333-3333-3333-3333-333333333333',
-          marca: 'Iveco Daily 70C16',
-          anio: 2019,
-          tipo: 'Furgón Distribución Urbana',
-          empresa: 'Distribuidora Centro C.A.',
-          cc: '5503',
-          km: 189000,
-          qrCode: 'SL-VEH-C90DC33-5503',
-        },
-        {
-          placa: 'C12LK77',
-          companyId: comp3 ? comp3.id : '33333333-3333-3333-3333-333333333333',
-          marca: 'Isuzu Forward',
-          anio: 2021,
-          tipo: 'Camión Cava Refrigerada',
-          empresa: 'Distribuidora Centro C.A.',
-          cc: '5504',
-          km: 275300,
-          qrCode: 'SL-VEH-C12LK77-5504',
-        },
+        
       ]);
       logger.info('[Seed] Maestro de Flota Vehicular poblado exitosamente para todas las empresas.');
     }
@@ -442,7 +404,7 @@ export const seedInitialData = async () => {
     // 5. Semilla de Órdenes de Servicio por Empresa
     const ordenCount = await OrdenServicio.count();
     if (ordenCount === 0) {
-      // Orden 1: Transporte Andina C.A.
+      // Orden 1: TRANSPORTE SAN LUIS DE LARA, C.A.
       const demoOrder1 = await OrdenServicio.create({
         id: 'OS-2026-00101',
         tenantId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
@@ -492,7 +454,7 @@ export const seedInitialData = async () => {
         requiereEscalamiento: false,
       });
 
-      // Orden 2: Agro Llanos C.A.
+      // Orden 2: SAN LUIS TRANSPORTE, C.A.
       const demoOrder2 = await OrdenServicio.create({
         id: 'OS-2026-00201',
         tenantId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
@@ -601,25 +563,6 @@ export const seedInitialData = async () => {
 
       // Semilla inicial de Auditoría y Trazabilidad para OS-2026-00101
       await OrdenAuditLog.bulkCreate([
-        {
-          ordenId: demoOrder1.id,
-          userName: 'Ing. Carlos Mendoza',
-          userEmail: 'carlos.mendoza@empresasanluis.com',
-          userRole: 'ADMIN',
-          action: 'APERTURA_ORDEN',
-          description: `Apertura inicial de Orden de Servicio ${demoOrder1.id} para la unidad A12BC3D (Mack Granite 2021) con 184,320 km.`,
-          ipAddress: '192.168.1.45',
-        },
-        {
-          ordenId: demoOrder1.id,
-          otId: demoArea1.id,
-          userName: 'José Ramírez',
-          userEmail: 'mecanico@empresasanluis.com',
-          userRole: 'MECANICO',
-          action: 'CREACION_OT',
-          description: `Apertura de Sub-Orden de Área ${demoArea1.id} (Reparaciones mayores) asignada a José Ramírez con 2 horas estimadas.`,
-          ipAddress: '192.168.1.102',
-        },
         {
           ordenId: demoOrder1.id,
           otId: demoArea1.id,

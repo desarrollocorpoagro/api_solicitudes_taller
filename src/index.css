@@ -51,11 +51,18 @@ body {
 }
 
 .wrap {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0 16px 140px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 12px 140px; /* Padding lateral reducido + reserva inferior para .gate */
+  box-sizing: border-box;
 }
 
+/* Contenedor principal a 100% del ancho disponible */
+main {
+  width: 100%;
+  max-width: 100%;
+}
 /* ---------- cabecera ---------- */
 .topbar {
   background: var(--navy);
@@ -64,7 +71,7 @@ body {
 }
 
 .topbar-in {
-  max-width: 1120px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 12px 16px;
   display: flex;
@@ -201,17 +208,19 @@ body {
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
-  z-index: 20;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  z-index: 100; /* Incrementado para estar por encima de la barra inferior y contenido */
+  overflow: visible; /* Cambiado de overflow-x: auto para evitar el recorte del menú desplegable */
 }
 
 .tabs-in {
-  max-width: 1120px;
+  max-width: 1440px;
   margin: 0 auto;
   display: flex;
-  min-width: max-content;
+  flex-wrap: wrap; /* Permite envolver elementos o mantener flujo visible */
   padding: 0 16px;
+  align-items: stretch;
+  gap: 4px;
+  position: relative;
 }
 
 .tab {
@@ -241,6 +250,99 @@ body {
 .tab.active {
   color: var(--navy);
   border-bottom-color: var(--lime);
+}
+
+/* ---------- menú jerárquico (padre + submenú) ---------- */
+.nav-group {
+  display: inline-flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 110;
+}
+
+.nav-group > .tab::after {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 6px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  opacity: 0.55;
+  transition: transform 0.18s ease;
+}
+
+.nav-group > .tab[aria-expanded="true"]::after {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+.nav-submenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 9999; /* Asegura la máxima prioridad visual de superposición */
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.25), 0 4px 12px rgba(15, 23, 42, 0.1);
+  min-width: 320px;
+  padding: 6px;
+  margin-top: 4px;
+}
+
+.nav-submenu::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 18px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  transform: rotate(45deg);
+  z-index: 10000;
+}
+
+.nav-submenu .tab.sub {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: .2px;
+  background: transparent;
+  color: var(--ink);
+  border-bottom: none;
+  white-space: nowrap;
+}
+
+.nav-submenu .tab.sub:hover {
+  background: var(--paper);
+  color: var(--navy);
+}
+
+.nav-submenu .tab.sub[aria-selected="true"],
+.nav-submenu .tab.sub.active {
+  background: var(--navy);
+  color: #ffffff;
+  border-bottom: none;
+}
+
+.nav-submenu-header {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--slate);
+  font-weight: 700;
+  padding: 6px 12px 4px;
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 4px;
 }
 
 .tab .num {
@@ -619,7 +721,7 @@ td.num, th.num {
 }
 
 .gate-in {
-  max-width: 1120px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 12px 16px;
   display: flex;
@@ -689,5 +791,7 @@ td.num, th.num {
   }
   .wrap {
     padding-bottom: 170px;
+    padding-left: 8px;
+    padding-right: 8px;
   }
 }

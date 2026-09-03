@@ -7,6 +7,16 @@
         "/^cd /c/Users/it\\.desarrollador/Documents/dev/taller/api_solicitudes_taller && npx tsc --noEmit 2>&1 \\| head -40$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^npx tsc --noEmit 2>&1 \\| head -80$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^npx tsc --noEmit -p tsconfig\\.json 2>&1 \\| head -100$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
-    }
+    },
+    "chat.byokUtilityModelDefault": "mainAgent",
+    "chat.editing.autoAcceptDelay": 10
 }

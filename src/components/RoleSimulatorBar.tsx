@@ -174,6 +174,15 @@ export const RoleSimulatorBar: React.FC<RoleSimulatorBarProps> = ({
   loading = false,
 }) => {
   const [expanded, setExpanded] = useState(false);
+
+  // Restringido a rol ADMIN: el simulador es una herramienta interna de QA
+  // para impersonar usuarios de prueba. No debe quedar visible para
+  // GERENTE_TALLER, MECANICO, OPERADOR, etc.
+  const isAdmin = (currentUser?.role || '').toUpperCase() === 'ADMIN';
+  if (!isAdmin) {
+    return null;
+  }
+
   const currentRoleDef = SYSTEM_ROLES.find(
     (r) => r.role === (currentUser?.role || 'OPERADOR')
   ) || SYSTEM_ROLES[0];

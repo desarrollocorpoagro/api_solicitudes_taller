@@ -1,15 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wrench,
+  Settings,
   Users,
   BookOpen,
   Bell,
   Image as ImageIcon,
   Terminal,
+  FolderOpen,
+  Stethoscope,
+  Package,
+  ExternalLink,
+  CheckCircle,
+  Archive,
+  Lock,
+  ClipboardList,
   Building2,
   LogOut,
-  Shield,
-  Layers
 } from 'lucide-react';
 import LoginScreen from './components/LoginScreen';
 import TallerModule from './components/TallerModule';
@@ -22,12 +29,130 @@ import SyncStatusBadge from './components/SyncStatusBadge';
 import RoleSimulatorBar from './components/RoleSimulatorBar';
 import SanLuisLogo from './components/SanLuisLogo';
 
+// ─── Tipos del menú jerárquico ────────────────────────────────────────────────
+export type ModuleId =
+  | 'taller'
+  | 'users'
+  | 'swagger'
+  | 'notifications'
+  | 'multimedia'
+  | 'query_runner';
+
+export type Permission = 'read' | 'write' | 'admin';
+
+export interface NavItem {
+  id: string;
+  label: string;
+  icon: any;
+  module?: ModuleId;
+  requires?: Permission;
+  children?: NavItem[];
+}
+
+export const navItems: NavItem[] = [
+  {
+    id: 'taller',
+    label: 'Taller San Luis',
+    icon: Wrench,
+    children: [
+      { id: 'apertura', label: '01 APERTURA', icon: FolderOpen, module: 'taller', requires: 'read' },
+      { id: 'areas-diagnostico', label: '02 ÁREAS Y DIAGNÓSTICO', icon: Stethoscope, module: 'taller', requires: 'read' },
+      { id: 'repuestos', label: '03 REPUESTOS', icon: Package, module: 'taller', requires: 'read' },
+      { id: 'externos', label: '04 EXTERNOS', icon: ExternalLink, module: 'taller', requires: 'read' },
+      { id: 'aprobaciones', label: '05 APROBACIONES', icon: CheckCircle, module: 'taller', requires: 'read' },
+      { id: 'almacen', label: '06 ALMACÉN', icon: Archive, module: 'taller', requires: 'read' },
+      { id: 'cierre', label: '07 CIERRE', icon: Lock, module: 'taller', requires: 'read' },
+      { id: 'auditoria', label: '08 AUDITORÍA Y TRAZABILIDAD', icon: ClipboardList, module: 'taller', requires: 'read' },
+    ],
+  },
+  {
+    id: 'configuracion',
+    label: 'Configuración',
+    icon: Settings,
+    children: [
+      { id: 'usuarios', label: 'Gestión Usuarios (RBAC)', icon: Users, module: 'users', requires: 'read' },
+      { id: 'swagger', label: 'Swagger API Explorer', icon: BookOpen, module: 'swagger', requires: 'read' },
+      { id: 'notificaciones', label: 'Notificaciones & Push', icon: Bell, module: 'notifications', requires: 'read' },
+      { id: 'multimedia', label: 'Archivos Multimedia', icon: ImageIcon, module: 'multimedia', requires: 'read' },
+      { id: 'pruebas', label: 'Consola Pruebas Unitarias', icon: Terminal, module: 'query_runner', requires: 'read' },
+    ],
+  },
+];
+
+// IDs de las 8 fases internas del taller (alias para activeTab)
+export type TallerSubNav =
+  | 'apertura'
+  | 'areas'
+  | 'repuestos'
+  | 'externos'
+  | 'aprob'
+  | 'almacen'
+  | 'cierre'
+  | 'auditoria';
+
+// Mapeo desde id del menú jerárquico → pestaña interna del TallerModule
+const SUBNAV_TO_TALLER_TAB: Record<string, TallerSubNav> = {
+  'apertura': 'apertura',
+  'areas-diagnostico': 'areas',
+  'repuestos': 'repuestos',
+  'externos': 'externos',
+  'aprobaciones': 'aprob',
+  'almacen': 'almacen',
+  'cierre': 'cierre',
+  'auditoria': 'auditoria',
+};
+
+// ─── Permisos por rol (RBAC) ──────────────────────────────────────────────────
+// Contrato: GET /api/v1/roles-permissions/role/:role → { success, data: [{ module, actions }] }
+// module es ModuleId; actions incluye 'read' cuando el rol puede acceder.
+export type RolePermissionsMap = Record<string, string[]>;
+
+const canAccess = (
+  perms: RolePermissionsMap | null,
+  moduleId: ModuleId | undefined,
+  required: Permission | undefined
+): boolean => {
+  // Si el item no declara módulo (p.ej. sólo agrupador) o no requiere permiso, se permite.
+  if (!moduleId || !required) return true;
+  // Mientras no tengamos permisos cargados (null) dejamos visible para no romper la UX.
+  if (!perms) return true;
+  const actions = perms[moduleId] || [];
+  return actions.includes(required);
+};
+
+const filterNavItemsByRole = (
+  items: NavItem[],
+  perms: RolePermissionsMap | null
+): NavItem[] => {
+  return items
+    .map((parent) => {
+      const filteredChildren = parent.children?.filter((c) =>
+        canAccess(perms, c.module, c.requires)
+      );
+      // Si el padre tiene hijos visibles, se muestra; si era un agrupador sin hijos propios, se oculta.
+      if (parent.children) {
+        if (!filteredChildren || filteredChildren.length === 0) return null;
+        return { ...parent, children: filteredChildren };
+      }
+      // Item sin hijos: se filtra por su propio module/requires
+      return canAccess(perms, parent.module, parent.requires) ? parent : null;
+    })
+    .filter((x): x is NavItem => x !== null);
+};
+
 export default function App() {
   const [token, setToken] = useState<string>('');
   const [user, setUser] = useState<any>(null);
   const [companies, setCompanies] = useState<any[]>([]);
   const [activeCompany, setActiveCompany] = useState<any>(null);
-  const [activeNav, setActiveNav] = useState<'taller' | 'usuarios' | 'swagger' | 'notificaciones' | 'multimedia' | 'pruebas'>('taller');
+  // activeNav = id del item del menú (puede ser padre 'taller'/'configuracion'
+  // o hijo directo 'apertura'/'areas-diagnostico'/etc.)
+  const [activeNav, setActiveNav] = useState<string>('apertura');
+  const [expandedParent, setExpandedParent] = useState<string | null>('taller');
+
+  // Permisos efectivos del rol activo (moduleId → actions[])
+  const [rolePerms, setRolePerms] = useState<RolePermissionsMap | null>(null);
+
   const [loading, setLoading] = useState(false);
 
   const handleLoginSuccess = (data: {
@@ -40,6 +165,35 @@ export default function App() {
     setUser(data.user);
     setActiveCompany(data.activeCompany);
     setCompanies(data.companies);
+    // Cargar permisos efectivos del rol (incluye merge con custom user perms)
+    fetchRolePermissions(data.user?.role, data.token);
+  };
+
+  // Carga permisos del rol activo. Si el usuario tiene permisos personalizados
+  // (customUserPermissions) se aplican como override sobre los del rol.
+  const fetchRolePermissions = async (role: string | undefined, authToken: string) => {
+    if (!role) {
+      setRolePerms(null);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/roles-permissions/role/${role}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        const map: RolePermissionsMap = {};
+        data.data.forEach((p: any) => {
+          map[p.module] = Array.isArray(p.actions) ? p.actions : [];
+        });
+        setRolePerms(map);
+      } else {
+        setRolePerms({});
+      }
+    } catch (err) {
+      console.error('Error cargando permisos del rol:', err);
+      setRolePerms({});
+    }
   };
 
   const handleLogout = () => {
@@ -47,7 +201,9 @@ export default function App() {
     setUser(null);
     setActiveCompany(null);
     setCompanies([]);
-    setActiveNav('taller');
+    setActiveNav('apertura');
+    setExpandedParent('taller');
+    setRolePerms(null);
   };
 
   const handleSwitchCompany = async (compId: string) => {
@@ -109,6 +265,8 @@ export default function App() {
           setUser(dataLogin.user);
           setActiveCompany(dataSelect.activeCompany);
           setCompanies(dataLogin.companies);
+          // Recargar permisos del nuevo rol (puede diferir del anterior)
+          fetchRolePermissions(dataLogin.user?.role, dataSelect.token);
         }
       }
     } catch (err) {
@@ -117,6 +275,25 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  // Aplica el filtro RBAC al árbol de navegación para el rol activo
+  const visibleNavItems = filterNavItemsByRole(navItems, rolePerms);
+
+  // Si el activeNav quedó oculto tras un cambio de permisos, caer al primer item visible
+  useEffect(() => {
+    if (!visibleNavItems.length) return;
+    const stillVisible = visibleNavItems.some((p) =>
+      p.children?.some((c) => c.id === activeNav) || p.id === activeNav
+    );
+    if (!stillVisible) {
+      const firstParent = visibleNavItems[0];
+      const firstLeaf = firstParent.children?.[0];
+      if (firstLeaf) {
+        setActiveNav(firstLeaf.id);
+        setExpandedParent(firstParent.id);
+      }
+    }
+  }, [visibleNavItems, activeNav]);
 
   // Si no hay sesión activa, mostrar la pantalla de Login
   if (!token || !user || !activeCompany) {
@@ -177,29 +354,53 @@ export default function App() {
           </div>
         </div>
 
-        {/* Barra de Navegación de Módulos */}
+        {/* Barra de Navegación Jerárquica: Padres + Submenús */}
         <div className="tabs">
           <div className="tabs-in">
-            {[
-              { id: 'taller', label: 'Taller San Luis', icon: Wrench },
-              { id: 'usuarios', label: 'Gestión Usuarios (RBAC)', icon: Users },
-              { id: 'swagger', label: 'Swagger API Explorer', icon: BookOpen },
-              { id: 'notificaciones', label: 'Notificaciones & Push', icon: Bell },
-              { id: 'multimedia', label: 'Archivos Multimedia', icon: ImageIcon },
-              { id: 'pruebas', label: 'Consola Pruebas Unitarias', icon: Terminal },
-            ].map((nav) => {
-              const Icon = nav.icon;
-              const isActive = activeNav === nav.id;
+            {visibleNavItems.map((parent) => {
+              const ParentIcon = parent.icon;
+              const isExpanded = expandedParent === parent.id;
+              const hasActiveChild = parent.children?.some((c) => c.id === activeNav);
+
               return (
-                <button
-                  key={nav.id}
-                  onClick={() => setActiveNav(nav.id as any)}
-                  className={`tab ${isActive ? 'active' : ''}`}
-                  aria-selected={isActive}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-[var(--navy)]' : 'text-[var(--slate)]'}`} />
-                  {nav.label}
-                </button>
+                <div key={parent.id} className="nav-group">
+                  <button
+                    onClick={() => setExpandedParent(isExpanded ? null : parent.id)}
+                    className={`tab ${hasActiveChild ? 'active' : ''}`}
+                    aria-expanded={isExpanded}
+                    aria-haspopup="true"
+                  >
+                    <ParentIcon className={`w-4 h-4 ${hasActiveChild ? 'text-[var(--navy)]' : 'text-[var(--slate)]'}`} />
+                    {parent.label}
+                  </button>
+
+                  {isExpanded && parent.children && (
+                    <div className="nav-submenu" role="menu" aria-label={`${parent.label} submenú`}>
+                      <div className="nav-submenu-header">
+                        {parent.label}
+                      </div>
+                      {parent.children.map((child) => {
+                        const ChildIcon = child.icon;
+                        const isChildActive = activeNav === child.id;
+                        return (
+                          <button
+                            key={child.id}
+                            role="menuitem"
+                            onClick={() => {
+                              setExpandedParent(parent.id);
+                              setActiveNav(child.id);
+                            }}
+                            className={`tab sub ${isChildActive ? 'active' : ''}`}
+                            aria-selected={isChildActive}
+                          >
+                            <ChildIcon className={`w-3.5 h-3.5 ${isChildActive ? 'text-[var(--lime)]' : 'text-[var(--slate)]'}`} />
+                            {child.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -215,18 +416,44 @@ export default function App() {
       />
 
       {/* Contenido Principal */}
-      <main className="flex-1 w-full max-w-[1120px] mx-auto p-4 sm:p-6">
-        {activeNav === 'taller' && <TallerModule token={token} activeCompany={activeCompany} currentUser={user} />}
-        {activeNav === 'usuarios' && <UserManagementModule token={token} currentUser={user} />}
-        {activeNav === 'swagger' && <SwaggerModule />}
-        {activeNav === 'notificaciones' && <NotificationsModule />}
-        {activeNav === 'multimedia' && <MultimediaModule />}
-        {activeNav === 'pruebas' && <TestConsoleModule />}
+      <main className="flex-1 w-full max-w-[1440px] mx-auto p-4 sm:p-6">
+        {(() => {
+          // Buscar el item activo recorriendo visibleNavItems (filtrado por RBAC)
+          let activeModule: ModuleId | undefined;
+          let tallerTab: TallerSubNav | undefined;
+          for (const parent of visibleNavItems) {
+            const leaf = parent.children?.find((c) => c.id === activeNav);
+            if (leaf) {
+              activeModule = leaf.module;
+              if (activeModule === 'taller') {
+                tallerTab = SUBNAV_TO_TALLER_TAB[leaf.id];
+              }
+              break;
+            }
+          }
+
+          if (activeModule === 'taller') {
+            return (
+              <TallerModule
+                token={token}
+                activeCompany={activeCompany}
+                currentUser={user}
+                initialTab={tallerTab}
+              />
+            );
+          }
+          if (activeModule === 'users') return <UserManagementModule token={token} currentUser={user} />;
+          if (activeModule === 'swagger') return <SwaggerModule />;
+          if (activeModule === 'notifications') return <NotificationsModule />;
+          if (activeModule === 'multimedia') return <MultimediaModule />;
+          if (activeModule === 'query_runner') return <TestConsoleModule />;
+          return null;
+        })()}
       </main>
 
       {/* Footer */}
       <footer className="bg-white border-t border-[var(--line)] text-[var(--slate)] text-xs py-4">
-        <div className="max-w-[1120px] mx-auto px-4 flex flex-wrap justify-between items-center gap-2">
+        <div className="max-w-[1440px] mx-auto px-4 flex flex-wrap justify-between items-center gap-2">
           <span>© 2026 Grupo San Luis — Plataforma Backend Multi-Tenant (MSSQL & Sequelize ORM)</span>
           <span className="font-mono text-[11px] text-[var(--slate)]">Identidad Corporativa San Luis • OpenAPI 3.0.3</span>
         </div>

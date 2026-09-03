@@ -46,6 +46,28 @@ export const updateUserSchema = {
     phone: Joi.string().allow('', null),
     role: Joi.string().valid('ADMIN', 'GERENTE_TALLER', 'MECANICO', 'RESPONSABLE_FLOTA', 'ALMACENISTA', 'OPERADOR'),
     isActive: Joi.boolean(),
+    // Aceptar reasignación multi-tenant desde el frontend.
+    // El controlador (user.controller.ts#updateUser) los procesa para sincronizar
+    // la tabla pivote user_companies. Son opcionales para permitir PATCH parciales.
+    companyIds: Joi.array().items(Joi.string().uuid()).optional(),
+    assignedCompanies: Joi.array()
+      .items(
+        Joi.object({
+          companyId: Joi.string().uuid().required(),
+          role: Joi.string()
+            .valid('ADMIN', 'GERENTE_TALLER', 'MECANICO', 'RESPONSABLE_FLOTA', 'ALMACENISTA', 'OPERADOR')
+            .optional(),
+          permissions: Joi.array()
+            .items(
+              Joi.object({
+                module: Joi.string().required(),
+                actions: Joi.array().items(Joi.string()).required(),
+              })
+            )
+            .optional(),
+        })
+      )
+      .optional(),
   }),
 };
 

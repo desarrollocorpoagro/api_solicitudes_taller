@@ -38,6 +38,11 @@ class Database extends EventEmitter {
     }
     try {
       this.db = new DatabaseSync(filename === ':memory:' ? ':memory:' : (filename || ':memory:'));
+      // PRAGMAs defensivos: evitan SQLITE_BUSY cuando múltiples procesos/secuencias
+      // tocan el mismo archivo SQLite simultáneamente.
+      try { this.db.exec('PRAGMA busy_timeout = 10000'); } catch (_e) {}
+      try { this.db.exec('PRAGMA journal_mode = WAL'); } catch (_e) {}
+      try { this.db.exec('PRAGMA synchronous = NORMAL'); } catch (_e) {}
       process.nextTick(() => {
         if (callback) callback(null);
         this.emit('open');

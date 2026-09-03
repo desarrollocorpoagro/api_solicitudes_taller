@@ -341,7 +341,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </div>
           )}
 
-          {/* Cuentas de Acceso Rápido / Demo */}
+          {/* Cuentas de Acceso Rápido / Demo — OCULTO: se utilizan los usuarios ya guardados en BD */}
+          {false && (
           <div
             style={{
               marginTop: 20,
@@ -537,11 +538,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               </button>
             </div>
           </div>
+          )}
+
         </div>
 
         {/* Pie de pantalla */}
         <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: 'var(--slate)' }}>
-          © 2026 Grupo San Luis • Sistema Integral Multi-Tenant con Auditoría Profit Plus
+          © 2026 Grupo San Luis 
         </div>
       </div>
     </div>

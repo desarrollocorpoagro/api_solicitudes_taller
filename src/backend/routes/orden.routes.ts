@@ -4,6 +4,7 @@ import { OrdenAreaController } from '../controllers/ordenArea.controller';
 import { RepuestosController } from '../controllers/repuestos.controller';
 import { ExternosController } from '../controllers/externos.controller';
 import { validateJoi } from '../middlewares/validate.middleware';
+import { authenticateToken } from '../middlewares/auth.middleware';
 import {
   createOrdenServicioSchema,
   cerrarOrdenServicioSchema,
@@ -14,6 +15,10 @@ import {
 } from '../validations/schemas';
 
 const router = Router();
+
+// Autenticación obligatoria: todas las rutas de órdenes requieren JWT válido.
+// Esto habilita el bypass de tenant para usuarios ADMIN global.
+router.use(authenticateToken('FULL_AUTH'));
 
 // 1. Órdenes Principales
 router.post('/', validateJoi(createOrdenServicioSchema), OrdenController.createOrden);

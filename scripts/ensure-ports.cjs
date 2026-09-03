@@ -43,7 +43,7 @@ function findPidsOnPort(port) {
     const pids = new Set();
     out.split(/\r?\n/).forEach((line) => {
       const m = line.match(new RegExp(`(?:TCP|UDP)\\s+\\S+\\:${port}\\s+\\S+\\s+(?:\\S+)\\s+(\\d+)`));
-      if (m && m[1]) pids.add(m[1]);
+      if (m && m[1] && m[1] !== '0') pids.add(m[1]); // PID 0 = sistema / TIME_WAIT huérfano
     });
     return [...pids];
   } else {
@@ -54,7 +54,8 @@ function findPidsOnPort(port) {
 }
 
 function killPid(pid) {
-  if (!pid) return false;
+  // PID 0 = System / socket huérfano en Windows; nunca se puede matar.
+  if (!pid || pid === '0') return false;
   try {
     if (isWindows) {
       execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
