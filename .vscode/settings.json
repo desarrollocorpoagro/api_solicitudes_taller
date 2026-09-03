@@ -15,6 +15,10 @@
         "/^npx tsc --noEmit -p tsconfig\\.json 2>&1 \\| head -100$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^netstat -ano 2>&1 \\| Select-String \":4000\\.\\*LISTENING\" \\| ForEach-Object \\{ \\(\\$_ -split '\\\\s\\+'\\)\\[-1\\] \\} \\| Sort-Object -Unique \\| ForEach-Object \\{ cmd\\.exe /c \"taskkill /F /PID \\$_\" 2>&1 \\}; sleep 3; echo \"OK\"$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     },
     "chat.byokUtilityModelDefault": "mainAgent",

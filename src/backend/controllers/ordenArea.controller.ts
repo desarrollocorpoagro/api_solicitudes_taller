@@ -21,7 +21,11 @@ export class OrdenAreaController {
       }
 
       const count = await OrdenArea.count({ where: { ordenId } });
-      const otId = `OT-A${count + 1}`;
+      // Incluir el ordenId en el OT id para garantizar unicidad global
+      // (la PK de ordenes_area es global, no por orden).
+      // Ej: OS-2026-00005 → OT-OS-2026-00005-A1, A2, ...
+      const ordenSlug = String(ordenId).replace(/[^A-Za-z0-9]/g, '');
+      const otId = `OT-${ordenSlug}-A${count + 1}`;
       const tarifa = TARIFAS_AREA[area] || 12;
       const horasNum = parseFloat(horas || '0');
       const costoManoObra = parseFloat((horasNum * tarifa).toFixed(2));
