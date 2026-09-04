@@ -1,6 +1,7 @@
 import { Request } from 'express';
 import { Op } from 'sequelize';
-import { Company, FlotaVehicular } from '../models';
+import { Company } from '../models';
+import { listUnidadesForTenant } from './flotaLookup';
 
 export interface TenantContext {
   companyId: string;
@@ -73,12 +74,12 @@ export async function getFleetTenantWhere(req: Request): Promise<any> {
 
 /**
  * Obtiene todas las placas autorizadas para el tenant activo.
+ *
+ * Lee desde la tabla espejo `flota_vehiculos` (la cual se mantiene en
+ * sincronización con MSSQL Profit AD_TRANS vía MasterSyncService).
  */
 export async function getAuthorizedPlatesForTenant(req: Request): Promise<string[]> {
-  const tenantWhere = await getFleetTenantWhere(req);
-  const vehicles = await FlotaVehicular.findAll({
-    where: tenantWhere,
-    attributes: ['placa'],
-  });
-  return vehicles.map((v) => v.placa);
+  const tenant = await getTenantContext(req);
+  const unidades = await listUnidadesForTenant(tenant?.companyName ?? null);
+  return unidades.map((v) => v.placa).filter(Boolean);
 }

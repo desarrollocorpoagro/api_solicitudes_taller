@@ -158,6 +158,56 @@ export async function initProfitMirrorSchema(): Promise<void> {
       );
     `);
 
+    await profitMirrorSequelize.query(`
+      CREATE TABLE IF NOT EXISTS flota_vehiculos (
+        codigo TEXT,
+        Placa TEXT PRIMARY KEY,
+        placa_anterior TEXT,
+        Empresa_Propietaria TEXT,
+        fec_adquisicion TEXT,
+        Marca TEXT,
+        Modelo TEXT,
+        color TEXT,
+        Año INTEGER,
+        clase TEXT,
+        Tipo TEXT,
+        Carga_max_kg REAL,
+        Carga_max_lts REAL,
+        Serial_carroceria1 TEXT,
+        Serial_carroceria2 TEXT,
+        Serial_Motor TEXT,
+        Uso TEXT,
+        Estatus_operatividad TEXT,
+        Observaciones TEXT,
+        cant_cauchos_vehiculo INTEGER,
+        medida_caucho_vehiculo TEXT,
+        km_actual REAL,
+        tipo_bateria1 TEXT,
+        serial_bateria1 TEXT,
+        fec_garantia_bateria1 TEXT,
+        tipo_bateria2 TEXT,
+        serial_bateria2 TEXT,
+        fec_garantia_bateria2 TEXT,
+        contrato_seguro TEXT,
+        empresa_seguro TEXT,
+        fec_venc_seguro TEXT,
+        fec_venc_trimestres TEXT,
+        nro_ROTC TEXT,
+        fec_venc_ROTC TEXT,
+        nro_RACDA TEXT,
+        fec_venc_RACDA TEXT,
+        nro_gps1 TEXT,
+        nro_gps2 TEXT,
+        nro_ejes INTEGER,
+        calibracion TEXT,
+        venc_calibrac TEXT,
+        tara REAL,
+        funcion TEXT,
+        division TEXT,
+        activo INTEGER DEFAULT 1
+      );
+    `);
+
     logger.info(`[Profit Mirror] Esquema SQLite espejo listo (./data/profit_ad_trans.sqlite).`);
   } catch (err: any) {
     logger.error(`[Profit Mirror] No se pudo inicializar el esquema SQLite espejo: ${err.message}`);

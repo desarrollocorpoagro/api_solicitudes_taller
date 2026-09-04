@@ -11,16 +11,17 @@ export class MasterSyncController {
    */
   public static async runMasterSync(req: Request, res: Response): Promise<Response> {
     try {
-      const entitiesRaw = (req.body?.entities as string[] | string | undefined) || ['mecanicos', 'vendedores', 'articulos'];
-      const validEntities: Array<'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio'> = [
+      const entitiesRaw = (req.body?.entities as string[] | string | undefined) || ['mecanicos', 'vendedores', 'articulos', 'flota_vehiculos'];
+      const validEntities: Array<'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio' | 'flota_vehiculos'> = [
         'mecanicos',
         'vendedores',
         'articulos',
         'flota_ordenes_servicio',
+        'flota_vehiculos',
       ];
       const entities = Array.isArray(entitiesRaw)
-        ? entitiesRaw.filter((e): e is 'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio' =>
-            validEntities.includes(e as 'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio')
+        ? entitiesRaw.filter((e): e is 'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio' | 'flota_vehiculos' =>
+            validEntities.includes(e as 'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio' | 'flota_vehiculos')
           )
         : validEntities;
 

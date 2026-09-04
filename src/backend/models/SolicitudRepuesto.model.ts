@@ -161,4 +161,9 @@ SolicitudRepuesto.init(
   }
 );
 
+// Importación diferida para evitar ciclos: el hook de creación de Gasto se
+// registra en models/index.ts, pero dejamos un comentario aquí para que el
+// desarrollador sepa dónde se acopla la lógica de gastos.
+void SolicitudRepuesto;
+
 export default SolicitudRepuesto;

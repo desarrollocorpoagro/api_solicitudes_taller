@@ -146,6 +146,10 @@ async function startServer() {
     // (mecánicos, vendedores, artículos y flota_ordenes_servicio).
     // Ejecuta un ciclo inmediato de poblado/inserción y luego continúa cada 30s.
     MasterSyncService.startBackgroundMasterSync(30000);
+    // Asegurar la tabla local de gastos y arrancar el sincronizador periódico
+    // hacia MSSQL Profit AD_TRANS (dbo.gastos).
+    await ensureGastosTableAndBackfill();
+    startBackgroundGastosSync(60000);
   } catch (dbErr: any) {
     logger.error(`[DatabaseInit] Error inicializando bases de datos: ${dbErr.message}`);
   }
@@ -164,3 +168,69 @@ startServer().catch((error) => {
   console.error('Error al iniciar el servidor San Luis:', error);
   process.exit(1);
 });
+
+// ============================================================
+// Bootstrap del módulo de gastos
+// ============================================================
+async function ensureGastosTableAndBackfill() {
+  try {
+    const { sequelize } = await import('./src/backend/models');
+    const { initGastoModel, Gasto } = await import('./src/backend/models/Gasto.model');
+    initGastoModel(sequelize);
+    await sequelize.query(
+      `CREATE TABLE IF NOT EXISTS gastos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        codigo_articulo VARCHAR(30),
+        codigo_subalmacen VARCHAR(30),
+        co_cli VARCHAR(30),
+        co_prov VARCHAR(30) DEFAULT 'GEN',
+        fecha_actividad DATETIME,
+        cantidad DECIMAL(18, 4),
+        unidad VARCHAR(10),
+        horas_trabajadas DECIMAL(18, 2) DEFAULT 0,
+        costo_unitario DECIMAL(18, 4),
+        costo_total_calculado DECIMAL(18, 4),
+        usuario VARCHAR(50) DEFAULT '',
+        nota VARCHAR(500) DEFAULT '',
+        fecha_create DATETIME,
+        ordenId VARCHAR(50),
+        solicitudId VARCHAR(50),
+        syncedToMssql TINYINT(1) DEFAULT 0,
+        mssqlSyncedAt DATETIME,
+        mssqlError VARCHAR(500),
+        createdAt DATETIME,
+        updatedAt DATETIME
+      )`
+    );
+    const { backfillGastosForOpenOrders } = await import('./src/backend/services/gastos.service');
+    const summary = await backfillGastosForOpenOrders();
+    logger.info(
+      `[GastosBootstrap] Tabla gastos OK. Backfill: processed=${summary.processed} created=${summary.created} updated=${summary.updated} skipped=${summary.skipped}`
+    );
+    void Gasto; // Mantener el modelo cargado para tipado
+  } catch (err: any) {
+    logger.error(`[GastosBootstrap] Error creando tabla gastos: ${err.message}`);
+  }
+}
+
+let gastosTimer: NodeJS.Timeout | null = null;
+function startBackgroundGastosSync(intervalMs: number) {
+  if (gastosTimer) clearInterval(gastosTimer);
+  const run = async () => {
+    try {
+      const svc = await import('./src/backend/services/gastos.service');
+      const report = await svc.syncGastosToMssql({ limit: 200 });
+      if (report.attempted > 0) {
+        logger.info(
+          `[GastosSyncBg] attempt=${report.attempted} inserted=${report.inserted} failed=${report.failed} (${report.durationMs}ms)`
+        );
+      }
+    } catch (err: any) {
+      logger.debug(`[GastosSyncBg] ciclo: ${err.message}`);
+    }
+  };
+  // Primer ciclo inmediato
+  run();
+  gastosTimer = setInterval(run, intervalMs);
+  if (gastosTimer.unref) gastosTimer.unref();
+}

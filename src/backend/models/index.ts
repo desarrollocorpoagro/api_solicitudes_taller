@@ -19,8 +19,10 @@ import DatabaseConnection from './DatabaseConnection.model';
 import RolePermission from './RolePermission.model';
 import UserPermission from './UserPermission.model';
 import SyncQueue, { initSyncQueueModel } from './SyncQueue.model';
-import { profitSequelize, initProfitDatabase, getProfitConnectionStatus } from '../config/profitDb';
+import { initGastoModel, Gasto } from './Gasto.model';
+import { profitSequelize, profitMirrorSequelize, initProfitDatabase, getProfitConnectionStatus } from '../config/profitDb';
 import { logger } from '../utils/logger';
+import { ensureLocalGastoForSolicitud } from '../services/gastos.service';
 
 // Definición de Relaciones Multi-Tenant y de Órdenes
 User.hasMany(UserCompany, { foreignKey: 'userId', as: 'userCompanies' });
@@ -73,7 +75,22 @@ export {
   UserPermission,
   SyncQueue,
   initSyncQueueModel,
+  Gasto,
 };
+
+// Inicializar el modelo Gasto contra la base local y garantizar su tabla.
+initGastoModel(sequelize);
+
+// Hook transaccional: cada SolicitudRepuesto nueva genera automáticamente un
+// registro en la tabla `gastos` local siempre que la orden padre NO esté
+// cerrada. Mantiene la relación de dominio sin acoplarse al trigger MSSQL.
+SolicitudRepuesto.afterCreate(async (solicitud, _options) => {
+  try {
+    await ensureLocalGastoForSolicitud(solicitud);
+  } catch (err: any) {
+    logger.warn(`[GastosHook] No se pudo crear gasto para solicitud ${solicitud.id}: ${err.message}`);
+  }
+});
 
 /**
  * Semilla inicial de datos para demostración y puesta en marcha inmediata.
@@ -94,8 +111,8 @@ export const seedInitialData = async () => {
         id: '11111111-1111-1111-1111-111111111111',
         name: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
         taxId: 'J-30516192-5',
-        email: 'contacto@transporteandina.com',
-        phone: '+58 274 2441122',
+        email: 'contacto@gruposanluis.com',
+        phone: '+58 251 2627049',
         isActive: true,
       });
 
@@ -103,8 +120,8 @@ export const seedInitialData = async () => {
         id: '22222222-2222-2222-2222-222222222222',
         name: 'SAN LUIS TRANSPORTE, C.A.',
         taxId: 'J-50178032-3',
-        email: 'operaciones@agrollanos.com',
-        phone: '+58 247 3349911',
+        email: 'contacto@sanluistrasnporte.com',
+        phone: '+58 251 123456',
         isActive: true,
       });
 
@@ -301,7 +318,10 @@ export const seedInitialData = async () => {
     logger.info('[Seed] Usuarios y asignaciones de todos los roles (9 roles) verificados exitosamente.');
 
     // 3. Semilla de Flota Vehicular Multi-Tenant
-    const flotaCount = await FlotaVehicular.count();
+    // La flota principal la sincroniza MasterSyncService desde MSSQL Profit AD_TRANS.
+    // Aquí consultamos el espejo SQLite para no tocar la tabla legacy `flota_vehicular`.
+    const [flotaMirrorCount]: any = await profitMirrorSequelize.query('SELECT COUNT(*) AS c FROM flota_vehiculos');
+    const flotaCount = parseInt(flotaMirrorCount?.[0]?.c ?? '0', 10) || 0;
     if (flotaCount === 0) {
       // await FlotaVehicular.bulkCreate([
       //   // Empresa 1: TRANSPORTE SAN LUIS DE LARA, C.A.

@@ -6,6 +6,7 @@ import VwFlotaVendedores from '../models/VwFlotaVendedores.model';
 import VwFlotaArticulos from '../models/VwFlotaArticulos.model';
 import FlotaOrdenServicioProfit from '../models/FlotaOrdenServicioProfit.model';
 import CatalogoRepuesto from '../models/CatalogoRepuesto.model';
+import FlotaVehicular from '../models/FlotaVehicular.model';
 import { logger } from '../utils/logger';
 
 /**
@@ -20,7 +21,7 @@ function getRemoteConnection(fallback: boolean): Sequelize {
  * Resultado de la sincronización bidireccional de una entidad maestra.
  */
 export interface MasterSyncReport {
-  entity: 'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio';
+  entity: 'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio' | 'flota_vehiculos';
   mssqlConnected: boolean;
   localCount: number;
   remoteCount: number;
@@ -51,6 +52,27 @@ export class MasterSyncService {
   private static lastReport: Record<string, MasterSyncReport> | null = null;
   private static timer: NodeJS.Timeout | null = null;
   private static intervalMs = 30000;
+
+  private static asText(value: any, fallback = ''): string {
+    if (value === null || value === undefined) return fallback;
+    const normalized = String(value).trim();
+    return normalized.length > 0 ? normalized : fallback;
+  }
+
+  private static asNumber(value: any, fallback = 0): number {
+    if (value === null || value === undefined || value === '') return fallback;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private static asBooleanInt(value: any): number {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'boolean') return value ? 1 : 0;
+    const normalized = String(value).trim().toLowerCase();
+    if (['1', 'true', 'y', 'yes', 's', 'si'].includes(normalized)) return 1;
+    if (['0', 'false', 'n', 'no'].includes(normalized)) return 0;
+    return Number(value) ? 1 : 0;
+  }
 
   /**
    * Inicia el ciclo de sincronización maestra bidireccional en segundo plano.
@@ -114,7 +136,7 @@ export class MasterSyncService {
    * para mantener la consistencia interna.
    */
   public static async runMasterBidirectionalSync(opts: {
-    entities?: Array<'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio'>;
+    entities?: Array<'mecanicos' | 'vendedores' | 'articulos' | 'flota_ordenes_servicio' | 'flota_vehiculos'>;
   } = {}): Promise<Record<string, MasterSyncReport>> {
     if (this.isRunning) {
       logger.warn('[MasterSyncService] Ya existe un ciclo de sincronización maestro en curso.');
@@ -129,7 +151,7 @@ export class MasterSyncService {
 
     this.isRunning = true;
     const startedAt = Date.now();
-    const entities = opts.entities || ['mecanicos', 'vendedores', 'articulos', 'flota_ordenes_servicio'];
+    const entities = opts.entities || ['mecanicos', 'vendedores', 'articulos', 'flota_ordenes_servicio', 'flota_vehiculos'];
 
     const conn = await getProfitConnectionStatus();
     // Chequeo estricto: MSSQL real, no fallback SQLite
@@ -153,6 +175,9 @@ export class MasterSyncService {
       }
       if (entities.includes('flota_ordenes_servicio')) {
         report.flota_ordenes_servicio = await this.syncFlotaOrdenesServicio(remoteReachable);
+      }
+      if (entities.includes('flota_vehiculos')) {
+        report.flota_vehiculos = await this.syncFlotaVehiculos(remoteReachable);
       }
     } catch (err: any) {
       logger.error(`[MasterSyncService] Error crítico durante la sincronización maestra: ${err.message}`);
@@ -225,7 +250,14 @@ export class MasterSyncService {
               // porque MecanicosProfit está bindeado a profitSequelize que apunta a MSSQL)
               await profitMirrorSequelize.query(
                 `INSERT INTO mecanicos (codigo, nombre, cargo, activo) VALUES (?, ?, ?, ?)`,
-                { replacements: [remote.codigo, remote.nombre, remote.cargo ?? null, remote.activo ? 1 : 0] }
+                {
+                  replacements: [
+                    this.asText(remote.codigo, 'SIN_CODIGO'),
+                    this.asText(remote.nombre, 'SIN NOMBRE'),
+                    this.asText(remote.cargo, ''),
+                    this.asBooleanInt(remote.activo),
+                  ],
+                }
               );
               report.insertedLocal++;
               logger.info(`[MasterSyncService:mecanicos] ➕ LOCAL ← MSSQL: ${codigo} - ${remote.nombre}`);
@@ -243,7 +275,14 @@ export class MasterSyncService {
               try {
                 await profitMirrorSequelize.query(
                   `UPDATE mecanicos SET nombre = ?, cargo = ?, activo = ? WHERE codigo = ?`,
-                  { replacements: [remote.nombre, remote.cargo ?? null, remote.activo ? 1 : 0, codigo] }
+                  {
+                    replacements: [
+                      this.asText(remote.nombre, 'SIN NOMBRE'),
+                      this.asText(remote.cargo, ''),
+                      this.asBooleanInt(remote.activo),
+                      codigo,
+                    ],
+                  }
                 );
                 report.updatedLocal++;
                 logger.debug(`[MasterSyncService:mecanicos] ✏️ LOCAL actualizado desde MSSQL: ${codigo}`);
@@ -339,7 +378,13 @@ export class MasterSyncService {
               // Insertar directamente en el espejo SQLite local
               await profitMirrorSequelize.query(
                 `INSERT INTO vw_flota_vendedores (co_ven, cedula, ven_des) VALUES (?, ?, ?)`,
-                { replacements: [remote.co_ven, remote.cedula, remote.ven_des] }
+                {
+                  replacements: [
+                    this.asText(remote.co_ven, 'SIN_CODIGO'),
+                    this.asText(remote.cedula, ''),
+                    this.asText(remote.ven_des, 'SIN NOMBRE'),
+                  ],
+                }
               );
               report.insertedLocal++;
               logger.info(`[MasterSyncService:vendedores] ➕ LOCAL ← MSSQL: ${coVen}`);
@@ -355,7 +400,13 @@ export class MasterSyncService {
               try {
                 await profitMirrorSequelize.query(
                   `UPDATE vw_flota_vendedores SET cedula = ?, ven_des = ? WHERE co_ven = ?`,
-                  { replacements: [remote.cedula, remote.ven_des, coVen] }
+                  {
+                    replacements: [
+                      this.asText(remote.cedula, ''),
+                      this.asText(remote.ven_des, 'SIN NOMBRE'),
+                      coVen,
+                    ],
+                  }
                 );
                 report.updatedLocal++;
                 logger.debug(`[MasterSyncService:vendedores] ✏️ LOCAL actualizado desde MSSQL: ${coVen}`);
@@ -390,6 +441,271 @@ export class MasterSyncService {
     } catch (err: any) {
       report.errors.push(`General: ${err.message}`);
       logger.error(`[MasterSyncService:vendedores] Error: ${err.message}`);
+    }
+
+    report.durationMs = Date.now() - start;
+    return report;
+  }
+
+  // ============================================================
+  // FLOTA VEHICULAR
+  // ============================================================
+  private static async syncFlotaVehiculos(remoteReachable: boolean): Promise<MasterSyncReport> {
+    const start = Date.now();
+    const report: MasterSyncReport = {
+      entity: 'flota_vehiculos',
+      mssqlConnected: remoteReachable,
+      localCount: 0,
+      remoteCount: 0,
+      insertedLocal: 0,
+      insertedRemote: 0,
+      updatedLocal: 0,
+      updatedRemote: 0,
+      unchanged: 0,
+      errors: [],
+      durationMs: 0,
+    };
+
+    try {
+      const localTableExists = await profitMirrorSequelize.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='flota_vehiculos'"
+      );
+      if (!localTableExists?.[0]?.length) {
+        await profitMirrorSequelize.query(`
+          CREATE TABLE IF NOT EXISTS flota_vehiculos (
+            codigo TEXT,
+            Placa TEXT PRIMARY KEY,
+            placa_anterior TEXT,
+            Empresa_Propietaria TEXT,
+            fec_adquisicion TEXT,
+            Marca TEXT,
+            Modelo TEXT,
+            color TEXT,
+            Año INTEGER,
+            clase TEXT,
+            Tipo TEXT,
+            Carga_max_kg REAL,
+            Carga_max_lts REAL,
+            Serial_carroceria1 TEXT,
+            Serial_carroceria2 TEXT,
+            Serial_Motor TEXT,
+            Uso TEXT,
+            Estatus_operatividad TEXT,
+            Observaciones TEXT,
+            cant_cauchos_vehiculo INTEGER,
+            medida_caucho_vehiculo TEXT,
+            km_actual REAL,
+            tipo_bateria1 TEXT,
+            serial_bateria1 TEXT,
+            fec_garantia_bateria1 TEXT,
+            tipo_bateria2 TEXT,
+            serial_bateria2 TEXT,
+            fec_garantia_bateria2 TEXT,
+            contrato_seguro TEXT,
+            empresa_seguro TEXT,
+            fec_venc_seguro TEXT,
+            fec_venc_trimestres TEXT,
+            nro_ROTC TEXT,
+            fec_venc_ROTC TEXT,
+            nro_RACDA TEXT,
+            fec_venc_RACDA TEXT,
+            nro_gps1 TEXT,
+            nro_gps2 TEXT,
+            nro_ejes INTEGER,
+            calibracion TEXT,
+            venc_calibrac TEXT,
+            tara REAL,
+            funcion TEXT,
+            division TEXT,
+            activo INTEGER DEFAULT 1
+          );
+        `);
+      }
+
+      const [localCountResult] = (await profitMirrorSequelize.query(`SELECT COUNT(*) AS c FROM flota_vehiculos`)) as any;
+      report.localCount = parseInt(localCountResult?.[0]?.c ?? '0', 10) || 0;
+
+      if (remoteReachable) {
+        const remoteTableCheck = await profitSequelize.query(
+          `SELECT TOP 1 * FROM [INFORMATION_SCHEMA].[TABLES] WHERE TABLE_NAME IN ('flota_vehiculos', 'flota_vehicular')`
+        );
+        if (remoteTableCheck?.[0]?.length) {
+          const tableMeta = remoteTableCheck[0][0] as { TABLE_NAME?: string };
+          const tableName = tableMeta.TABLE_NAME;
+          if (!tableName) {
+            throw new Error('No se pudo determinar el nombre de la tabla remota de flota vehicular.');
+          }
+          const [remoteCountResult] = (await profitSequelize.query(`SELECT COUNT(*) AS c FROM [AD_TRANS].[dbo].[${tableName}] WITH (NOLOCK)`)) as any;
+          report.remoteCount = parseInt(remoteCountResult?.[0]?.c ?? '0', 10) || 0;
+
+          const [remoteRowsRaw] = (await profitSequelize.query(
+            `SELECT * FROM [AD_TRANS].[dbo].[${tableName}] WITH (NOLOCK)`
+          )) as any;
+          const remoteRows = remoteRowsRaw || [];
+          const [localRowsRaw] = (await profitMirrorSequelize.query(`SELECT * FROM flota_vehiculos`)) as any;
+          const localRows = localRowsRaw || [];
+          const localMap = new Map<string, any>(localRows.map((r: any) => [String(r.Placa ?? r.placa).trim(), r]));
+          const remoteMap = new Map<string, any>(remoteRows.map((r: any) => [String(r.Placa ?? r.placa).trim(), r]));
+
+          for (const [placa, remote] of remoteMap.entries()) {
+            const flotaColumns: Array<[string, () => any]> = [
+              ['codigo', () => this.asText(remote.codigo, '')],
+              ['Placa', () => this.asText(remote.Placa ?? remote.placa ?? placa, 'SIN_PLACA')],
+              ['placa_anterior', () => this.asText(remote.placa_anterior, '')],
+              ['Empresa_Propietaria', () => this.asText(remote.Empresa_Propietaria, '')],
+              ['fec_adquisicion', () => remote.fec_adquisicion ?? null],
+              ['Marca', () => this.asText(remote.Marca, '')],
+              ['Modelo', () => this.asText(remote.Modelo, '')],
+              ['color', () => this.asText(remote.color, '')],
+              ['Año', () => this.asNumber(remote.Año, 0)],
+              ['clase', () => this.asText(remote.clase, '')],
+              ['Tipo', () => this.asText(remote.Tipo, '')],
+              ['Carga_max_kg', () => this.asNumber(remote.Carga_max_kg, 0)],
+              ['Carga_max_lts', () => this.asNumber(remote.Carga_max_lts, 0)],
+              ['Serial_carroceria1', () => this.asText(remote.Serial_carroceria1, '')],
+              ['Serial_carroceria2', () => this.asText(remote.Serial_carroceria2, '')],
+              ['Serial_Motor', () => this.asText(remote.Serial_Motor, '')],
+              ['Uso', () => this.asText(remote.Uso, '')],
+              ['Estatus_operatividad', () => this.asText(remote.Estatus_operatividad, '')],
+              ['Observaciones', () => this.asText(remote.Observaciones, '')],
+              ['cant_cauchos_vehiculo', () => this.asNumber(remote.cant_cauchos_vehiculo, 0)],
+              ['medida_caucho_vehiculo', () => this.asText(remote.medida_caucho_vehiculo, '')],
+              ['km_actual', () => this.asNumber(remote.km_actual, 0)],
+              ['tipo_bateria1', () => this.asText(remote.tipo_bateria1, '')],
+              ['serial_bateria1', () => this.asText(remote.serial_bateria1, '')],
+              ['fec_garantia_bateria1', () => remote.fec_garantia_bateria1 ?? null],
+              ['tipo_bateria2', () => this.asText(remote.tipo_bateria2, '')],
+              ['serial_bateria2', () => this.asText(remote.serial_bateria2, '')],
+              ['fec_garantia_bateria2', () => remote.fec_garantia_bateria2 ?? null],
+              ['contrato_seguro', () => this.asText(remote.contrato_seguro, '')],
+              ['empresa_seguro', () => this.asText(remote.empresa_seguro, '')],
+              ['fec_venc_seguro', () => remote.fec_venc_seguro ?? null],
+              ['fec_venc_trimestres', () => remote.fec_venc_trimestres ?? null],
+              ['nro_ROTC', () => this.asText(remote.nro_ROTC, '')],
+              ['fec_venc_ROTC', () => remote.fec_venc_ROTC ?? null],
+              ['nro_RACDA', () => this.asText(remote.nro_RACDA, '')],
+              ['fec_venc_RACDA', () => remote.fec_venc_RACDA ?? null],
+              ['nro_gps1', () => this.asText(remote.nro_gps1, '')],
+              ['nro_gps2', () => this.asText(remote.nro_gps2, '')],
+              ['nro_ejes', () => this.asNumber(remote.nro_ejes, 0)],
+              ['calibracion', () => this.asText(remote.calibracion, '')],
+              ['venc_calibrac', () => remote.venc_calibrac ?? null],
+              ['tara', () => this.asNumber(remote.tara, 0)],
+              ['funcion', () => this.asText(remote.funcion, '')],
+              ['division', () => this.asText(remote.division, '')],
+              ['activo', () => this.asBooleanInt(remote.activo)],
+            ];
+
+            if (!localMap.has(placa)) {
+              try {
+                const colsSql = flotaColumns.map((c) => c[0]).join(', ');
+                const placeholdersSql = flotaColumns.map(() => '?').join(', ');
+                const values = flotaColumns.map((c) => c[1]());
+                await profitMirrorSequelize.query(
+                  `INSERT INTO flota_vehiculos (${colsSql}) VALUES (${placeholdersSql})`,
+                  { replacements: values }
+                );
+                report.insertedLocal++;
+              } catch (e: any) {
+                report.errors.push(`LOCAL insert ${placa}: ${e.message}`);
+              }
+            } else {
+              const local = localMap.get(placa);
+              const differs = JSON.stringify({
+                codigo: local?.codigo ?? null,
+                placa_anterior: local?.placa_anterior ?? null,
+                Empresa_Propietaria: local?.Empresa_Propietaria ?? null,
+                Marca: local?.Marca ?? null,
+                Modelo: local?.Modelo ?? null,
+                color: local?.color ?? null,
+                Año: local?.Año ?? null,
+                clase: local?.clase ?? null,
+                Tipo: local?.Tipo ?? null,
+                Carga_max_kg: local?.Carga_max_kg ?? null,
+                Carga_max_lts: local?.Carga_max_lts ?? null,
+                km_actual: local?.km_actual ?? null,
+                activo: local?.activo ?? null,
+              }) !== JSON.stringify({
+                codigo: remote?.codigo ?? null,
+                placa_anterior: remote?.placa_anterior ?? null,
+                Empresa_Propietaria: remote?.Empresa_Propietaria ?? null,
+                Marca: remote?.Marca ?? null,
+                Modelo: remote?.Modelo ?? null,
+                color: remote?.color ?? null,
+                Año: remote?.Año ?? null,
+                clase: remote?.clase ?? null,
+                Tipo: remote?.Tipo ?? null,
+                Carga_max_kg: remote?.Carga_max_kg ?? null,
+                Carga_max_lts: remote?.Carga_max_lts ?? null,
+                km_actual: remote?.km_actual ?? null,
+                activo: remote?.activo ?? null,
+              });
+              if (differs) {
+                try {
+                  await profitMirrorSequelize.query(
+                    `UPDATE flota_vehiculos SET codigo = ?, placa_anterior = ?, Empresa_Propietaria = ?, fec_adquisicion = ?, Marca = ?, Modelo = ?, color = ?, Año = ?, clase = ?, Tipo = ?, Carga_max_kg = ?, Carga_max_lts = ?, Serial_carroceria1 = ?, Serial_carroceria2 = ?, Serial_Motor = ?, Uso = ?, Estatus_operatividad = ?, Observaciones = ?, cant_cauchos_vehiculo = ?, medida_caucho_vehiculo = ?, km_actual = ?, tipo_bateria1 = ?, serial_bateria1 = ?, fec_garantia_bateria1 = ?, tipo_bateria2 = ?, serial_bateria2 = ?, fec_garantia_bateria2 = ?, contrato_seguro = ?, empresa_seguro = ?, fec_venc_seguro = ?, fec_venc_trimestres = ?, nro_ROTC = ?, fec_venc_ROTC = ?, nro_RACDA = ?, fec_venc_RACDA = ?, nro_gps1 = ?, nro_gps2 = ?, nro_ejes = ?, calibracion = ?, venc_calibrac = ?, tara = ?, funcion = ?, division = ?, activo = ? WHERE Placa = ?`,
+                    { replacements: [
+                      remote.codigo ?? null,
+                      remote.placa_anterior ?? null,
+                      remote.Empresa_Propietaria ?? null,
+                      remote.fec_adquisicion ?? null,
+                      remote.Marca ?? null,
+                      remote.Modelo ?? null,
+                      remote.color ?? null,
+                      remote.Año ?? null,
+                      remote.clase ?? null,
+                      remote.Tipo ?? null,
+                      remote.Carga_max_kg ?? null,
+                      remote.Carga_max_lts ?? null,
+                      remote.Serial_carroceria1 ?? null,
+                      remote.Serial_carroceria2 ?? null,
+                      remote.Serial_Motor ?? null,
+                      remote.Uso ?? null,
+                      remote.Estatus_operatividad ?? null,
+                      remote.Observaciones ?? null,
+                      remote.cant_cauchos_vehiculo ?? null,
+                      remote.medida_caucho_vehiculo ?? null,
+                      remote.km_actual ?? null,
+                      remote.tipo_bateria1 ?? null,
+                      remote.serial_bateria1 ?? null,
+                      remote.fec_garantia_bateria1 ?? null,
+                      remote.tipo_bateria2 ?? null,
+                      remote.serial_bateria2 ?? null,
+                      remote.fec_garantia_bateria2 ?? null,
+                      remote.contrato_seguro ?? null,
+                      remote.empresa_seguro ?? null,
+                      remote.fec_venc_seguro ?? null,
+                      remote.fec_venc_trimestres ?? null,
+                      remote.nro_ROTC ?? null,
+                      remote.fec_venc_ROTC ?? null,
+                      remote.nro_RACDA ?? null,
+                      remote.fec_venc_RACDA ?? null,
+                      remote.nro_gps1 ?? null,
+                      remote.nro_gps2 ?? null,
+                      remote.nro_ejes ?? null,
+                      remote.calibracion ?? null,
+                      remote.venc_calibrac ?? null,
+                      remote.tara ?? null,
+                      remote.funcion ?? null,
+                      remote.division ?? null,
+                      remote.activo ?? 1,
+                      placa,
+                    ] }
+                  );
+                  report.updatedLocal++;
+                } catch (e: any) {
+                  report.errors.push(`LOCAL update ${placa}: ${e.message}`);
+                }
+              } else {
+                report.unchanged++;
+              }
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      report.errors.push(`General: ${err.message}`);
+      logger.error(`[MasterSyncService:flota_vehiculos] Error: ${err.message}`);
     }
 
     report.durationMs = Date.now() - start;
@@ -629,15 +945,26 @@ export class MasterSyncService {
                  recibe_conforme, hora_apertura, hora_cierre)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               { replacements: [
-                remote.nro_orden, remote.Placa, remote.km_horometro, remote.recibido_por,
-                remote.entregado_por ?? null, remote.fec_apertura ?? new Date(),
-                remote.fec_cierre ?? null, remote.sintomas_reportados ?? '',
-                remote.es_reincidencia ? 1 : 0, remote.nro_orden_anterior ?? null,
-                remote.motivo_reincidencia ?? null, remote.fotos_adjuntas ?? 0,
-                remote.estatus ?? 'ABIERTA', remote.costo_repuestos ?? 0,
-                remote.costo_mano_obra ?? 0, remote.costo_servicios_ext ?? 0,
-                remote.costo_total ?? 0, remote.recibe_conforme ?? null,
-                remote.hora_apertura ?? null, remote.hora_cierre ?? null
+                this.asText(remote.nro_orden, 'SIN_ORDEN'),
+                this.asText(remote.Placa, 'SIN_PLACA'),
+                this.asNumber(remote.km_horometro, 0),
+                this.asText(remote.recibido_por, 'DESCONOCIDO'),
+                this.asText(remote.entregado_por, ''),
+                remote.fec_apertura ?? new Date(),
+                remote.fec_cierre ?? null,
+                this.asText(remote.sintomas_reportados, 'SIN SINTOMAS'),
+                this.asBooleanInt(remote.es_reincidencia),
+                this.asText(remote.nro_orden_anterior, ''),
+                this.asText(remote.motivo_reincidencia, ''),
+                this.asNumber(remote.fotos_adjuntas, 0),
+                this.asText(remote.estatus, 'ABIERTA'),
+                this.asNumber(remote.costo_repuestos, 0),
+                this.asNumber(remote.costo_mano_obra, 0),
+                this.asNumber(remote.costo_servicios_ext, 0),
+                this.asNumber(remote.costo_total, 0),
+                this.asText(remote.recibe_conforme, ''),
+                remote.hora_apertura ?? null,
+                remote.hora_cierre ?? null,
               ] }
             );
             report.insertedLocal++;
@@ -662,15 +989,26 @@ export class MasterSyncService {
                 hora_apertura = ?, hora_cierre = ?
                WHERE nro_orden = ?`,
               { replacements: [
-                remote.Placa, remote.km_horometro, remote.recibido_por,
-                remote.entregado_por ?? null, remote.fec_apertura ?? new Date(),
-                remote.fec_cierre ?? null, remote.sintomas_reportados ?? '',
-                remote.es_reincidencia ? 1 : 0, remote.nro_orden_anterior ?? null,
-                remote.motivo_reincidencia ?? null, remote.fotos_adjuntas ?? 0,
-                remote.estatus ?? 'ABIERTA', remote.costo_repuestos ?? 0,
-                remote.costo_mano_obra ?? 0, remote.costo_servicios_ext ?? 0,
-                remote.costo_total ?? 0, remote.recibe_conforme ?? null,
-                remote.hora_apertura ?? null, remote.hora_cierre ?? null, nroOrden
+                this.asText(remote.Placa, 'SIN_PLACA'),
+                this.asNumber(remote.km_horometro, 0),
+                this.asText(remote.recibido_por, 'DESCONOCIDO'),
+                this.asText(remote.entregado_por, ''),
+                remote.fec_apertura ?? new Date(),
+                remote.fec_cierre ?? null,
+                this.asText(remote.sintomas_reportados, 'SIN SINTOMAS'),
+                this.asBooleanInt(remote.es_reincidencia),
+                this.asText(remote.nro_orden_anterior, ''),
+                this.asText(remote.motivo_reincidencia, ''),
+                this.asNumber(remote.fotos_adjuntas, 0),
+                this.asText(remote.estatus, 'ABIERTA'),
+                this.asNumber(remote.costo_repuestos, 0),
+                this.asNumber(remote.costo_mano_obra, 0),
+                this.asNumber(remote.costo_servicios_ext, 0),
+                this.asNumber(remote.costo_total, 0),
+                this.asText(remote.recibe_conforme, ''),
+                remote.hora_apertura ?? null,
+                remote.hora_cierre ?? null,
+                nroOrden,
               ] }
             );
             report.updatedLocal++;

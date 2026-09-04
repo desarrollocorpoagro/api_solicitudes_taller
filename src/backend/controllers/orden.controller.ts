@@ -5,7 +5,6 @@ import {
   OrdenArea,
   SolicitudRepuesto,
   SolicitudExterno,
-  FlotaVehicular,
   Multimedia,
   Company,
   FlotaOrdenServicioProfit,
@@ -16,6 +15,7 @@ import { SyncService } from '../services/sync.service';
 import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 import { getTenantContext, getAuthorizedPlatesForTenant } from '../utils/tenantHelper';
+import { findUnidadByPlaca } from '../utils/flotaLookup';
 
 export class OrdenController {
   /**
@@ -136,9 +136,7 @@ export class OrdenController {
       const cleanPlaca = placa.toUpperCase().trim();
       const tenant = await getTenantContext(req);
 
-      const unidad = await FlotaVehicular.findOne({
-        where: { placa: cleanPlaca },
-      });
+      const unidad = await findUnidadByPlaca(cleanPlaca);
 
       if (!unidad) {
         return res.status(404).json({
@@ -322,7 +320,7 @@ export class OrdenController {
         return res.status(404).json({ success: false, error: 'Orden de servicio no encontrada.' });
       }
 
-      const unidad = await FlotaVehicular.findOne({ where: { placa: orden.placa } });
+      const unidad = await findUnidadByPlaca(orden.placa);
 
       // Validar pertenencia a la empresa activa
       // Bypass: ADMIN global puede consultar órdenes de cualquier tenant.
@@ -330,7 +328,7 @@ export class OrdenController {
       const isAdminGlobal = req.user?.role?.toUpperCase() === 'ADMIN';
       if (tenant && !isAdminGlobal) {
         const matchesTenantId = orden.tenantId && orden.tenantId === tenant.companyId;
-        const matchesVehicleCompany = unidad && (unidad.companyId === tenant.companyId || unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase());
+        const matchesVehicleCompany = unidad && (unidad.empresa && unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase());
 
         if (!matchesTenantId && !matchesVehicleCompany) {
           return res.status(403).json({
@@ -380,7 +378,7 @@ export class OrdenController {
         return res.status(404).json({ success: false, error: 'Orden de servicio no encontrada.' });
       }
 
-      const unidad = await FlotaVehicular.findOne({ where: { placa: orden.placa } });
+      const unidad = await findUnidadByPlaca(orden.placa);
 
       // Validar aislamiento multi-tenant
       // Bypass: ADMIN global puede cerrar órdenes de cualquier tenant.
@@ -388,7 +386,7 @@ export class OrdenController {
       const isAdminGlobal = req.user?.role?.toUpperCase() === 'ADMIN';
       if (tenant && !isAdminGlobal) {
         const matchesTenantId = orden.tenantId && orden.tenantId === tenant.companyId;
-        const matchesVehicleCompany = unidad && (unidad.companyId === tenant.companyId || unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase());
+        const matchesVehicleCompany = unidad && (unidad.empresa && unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase());
         if (!matchesTenantId && !matchesVehicleCompany) {
           return res.status(403).json({
             success: false,

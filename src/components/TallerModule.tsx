@@ -261,8 +261,9 @@ export const TallerModule: React.FC<{
   token: string;
   activeCompany: any;
   currentUser?: any;
+  rolePerms?: Record<string, string[]>;
   initialTab?: TallerTabId;
-}> = ({ token, activeCompany, currentUser, initialTab }) => {
+}> = ({ token, activeCompany, currentUser, rolePerms, initialTab }) => {
   const [activeTab, setActiveTab] = useState<TallerTabId>(initialTab ?? 'apertura');
 
   // Listas de la empresa activa
@@ -340,6 +341,25 @@ export const TallerModule: React.FC<{
       cargarOrdenActual(ordNo);
     }
   }, [ordNo]);
+
+  const TALLER_TAB_ACCESS: Record<TallerTabId, Array<'read' | 'update' | 'approve' | 'admin'>> = {
+    apertura: ['read'],
+    areas: ['read', 'update'],
+    repuestos: ['read'],
+    externos: ['read'],
+    aprob: ['read', 'approve'],
+    almacen: ['read'],
+    cierre: ['read', 'update', 'admin'],
+    auditoria: ['read'],
+  };
+
+  const canAccessTab = (tabId: TallerTabId) => {
+    const required = TALLER_TAB_ACCESS[tabId] || ['read'];
+    const actions = rolePerms?.taller || [];
+    if (rolePerms && Object.keys(rolePerms).length > 0 && actions.length === 0) return false;
+    if (!rolePerms) return true;
+    return required.some((action) => actions.includes(action));
+  };
 
   // Cambiar pestaña activa por defecto según el rol del usuario autenticado
   useEffect(() => {
@@ -843,6 +863,24 @@ export const TallerModule: React.FC<{
 
   const puedeCerrar = validaciones.length === 0;
 
+  const visibleTabs = [
+    { id: 'apertura', num: '01', label: 'Apertura', flag: !unidad || !sintomas.trim() },
+    { id: 'areas', num: '02', label: 'Áreas y diagnóstico', flag: !ots.length || otsAbiertas.length > 0 },
+    { id: 'repuestos', num: '03', label: 'Repuestos', flag: false },
+    { id: 'externos', num: '04', label: 'Servicios externos', flag: false },
+    { id: 'aprob', num: '05', label: 'Aprobaciones', flag: pendAprob > 0 },
+    { id: 'almacen', num: '06', label: 'Almacén', flag: sinDespacho > 0 },
+    { id: 'cierre', num: '07', label: 'Cierre', flag: !puedeCerrar },
+    { id: 'auditoria', num: '08', label: 'Auditoría / Trazabilidad', flag: false },
+  ].filter((tab) => canAccessTab(tab.id as TallerTabId));
+
+  useEffect(() => {
+    if (!visibleTabs.some((tab) => tab.id === activeTab)) {
+      const fallback = visibleTabs[0];
+      if (fallback) setActiveTab(fallback.id as TallerTabId);
+    }
+  }, [visibleTabs, activeTab]);
+
   return (
     <div className="wrap">
       {/* Toast Notification */}
@@ -918,33 +956,6 @@ export const TallerModule: React.FC<{
           </div>
         </div>
 
-        {/* Selector rápido de flota de la empresa */}
-        {companyFleet.length > 0 && (
-          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--line-soft)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, color: 'var(--slate)', fontWeight: 600 }}>Unidades de {activeCompany?.code || 'esta empresa'}:</span>
-            {companyFleet.map((v) => (
-              <button
-                key={v.placa}
-                type="button"
-                onClick={() => {
-                  setPlaca(v.placa);
-                  consultarPlaca(v.placa);
-                }}
-                className={`chip mono ${placa === v.placa ? 'b-ok' : ''}`}
-                style={{
-                  cursor: 'pointer',
-                  border: placa === v.placa ? '2px solid var(--navy)' : '1px solid var(--line)',
-                  background: placa === v.placa ? 'var(--navy)' : '#ffffff',
-                  color: placa === v.placa ? '#ffffff' : 'var(--ink)',
-                  fontWeight: 600,
-                  fontSize: 12,
-                }}
-              >
-                {v.placa} ({v.marca})
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Top Banner de la Orden */}
@@ -981,16 +992,7 @@ export const TallerModule: React.FC<{
       {/* Navegación por pestañas (Fase 1 Taller) */}
       <div className="tabs" style={{ borderRadius: 'var(--r)', marginBottom: 16 }}>
         <div className="tabs-in">
-          {[
-            { id: 'apertura', num: '01', label: 'Apertura', flag: !unidad || !sintomas.trim() },
-            { id: 'areas', num: '02', label: 'Áreas y diagnóstico', flag: !ots.length || otsAbiertas.length > 0 },
-            { id: 'repuestos', num: '03', label: 'Repuestos', flag: false },
-            { id: 'externos', num: '04', label: 'Servicios externos', flag: false },
-            { id: 'aprob', num: '05', label: 'Aprobaciones', flag: pendAprob > 0 },
-            { id: 'almacen', num: '06', label: 'Almacén', flag: sinDespacho > 0 },
-            { id: 'cierre', num: '07', label: 'Cierre', flag: !puedeCerrar },
-            { id: 'auditoria', num: '08', label: 'Auditoría / Trazabilidad', flag: false },
-          ].map(t => (
+          {visibleTabs.map(t => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id as any)}

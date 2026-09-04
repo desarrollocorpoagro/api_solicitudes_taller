@@ -58,7 +58,10 @@ function killPid(pid) {
   if (!pid || pid === '0') return false;
   try {
     if (isWindows) {
-      execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
+      // Usar cmd /c con taskkill y pipes redirigidos para que PowerShell no
+      // muestre el prompt interactivo "¿Desea terminar el trabajo por lotes (S/N)?"
+      // cuando el proceso pertenece a otra sesión.
+      execSync(`cmd /c taskkill /F /PID ${pid} <nul 2>&1`, { stdio: 'ignore' });
     } else {
       execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
     }

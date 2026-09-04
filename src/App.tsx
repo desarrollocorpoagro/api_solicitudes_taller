@@ -438,6 +438,7 @@ export default function App() {
                 token={token}
                 activeCompany={activeCompany}
                 currentUser={user}
+                rolePerms={rolePerms || {}}
                 initialTab={tallerTab}
               />
             );

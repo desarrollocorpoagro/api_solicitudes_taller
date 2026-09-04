@@ -14,6 +14,7 @@ import profitFlotaRoutes from './profitFlota.routes';
 import dbConnectionRoutes from './dbConnection.routes';
 import rolePermissionRoutes from './rolePermission.routes';
 import syncRoutes from './sync.routes';
+import gastosRoutes from './gastos.routes';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/profit', profitFlotaRoutes);
 router.use('/db-connections', dbConnectionRoutes);
 router.use('/roles-permissions', rolePermissionRoutes);
 router.use('/sync', syncRoutes);
+router.use('/gastos', gastosRoutes);
 
 export default router;
