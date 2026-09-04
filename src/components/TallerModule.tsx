@@ -824,7 +824,11 @@ export const TallerModule: React.FC<{
       const data = await res.json();
       if (data.success) {
         setEstadoOrden('Cerrada');
-        showToast('¡Orden cerrada exitosamente y liquidación enviada al ERP!');
+        if (data.advertencias && data.advertencias.length > 0) {
+          showToast(`Orden cerrada con advertencia: ${data.advertencias[0]}`, 'err');
+        } else {
+          showToast('¡Orden cerrada exitosamente y liquidación enviada al ERP!');
+        }
         cargarOrdenActual(ordNo);
         // Refrescar lista de órdenes
         const resOrdenes = await authFetch('/api/v1/ordenes');
@@ -847,9 +851,10 @@ export const TallerModule: React.FC<{
   const serviciosGarantia = exts.filter(x => x.conGarantia).length;
   const totalGeneral = totalRepuestos + totalManoObra + totalExternos;
 
-  // Validaciones
+  // Validaciones (bloqueantes para el cierre) + Advertencias (no bloquean)
   const validaciones: string[] = [];
-  if (!unidad) validaciones.push('Falta identificar la unidad.');
+  const advertenciasCierre: string[] = [];
+  if (!unidad) advertenciasCierre.push(`La unidad con placa ${placa} no fue ubicada en el maestro de flota. La orden puede cerrarse, pero la conciliación contra MSSQL quedará pendiente.`);
   if (!sintomas.trim()) validaciones.push('Falta registrar los síntomas reportados.');
   if (!ots.length) validaciones.push('No hay órdenes de área abiertas.');
   const otsAbiertas = ots.filter(o => o.estado === 'abierta');
@@ -2030,6 +2035,16 @@ export const TallerModule: React.FC<{
             ) : (
               <div className="note n-ok" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <CheckCircle className="w-4 h-4 text-[var(--ok)]" /> Todas las validaciones están conformes. La orden puede cerrarse.
+              </div>
+            )}
+            {advertenciasCierre.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                {advertenciasCierre.map((a, i) => (
+                  <div key={i} className="note n-hi" style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <AlertTriangle className="w-4 h-4 text-[var(--info)]" />
+                    <span>{a}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>

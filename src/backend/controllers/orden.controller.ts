@@ -63,12 +63,24 @@ export class OrdenController {
 
   /**
    * Valida los criterios necesarios para autorizar el cierre formal de la orden.
+   *
+   * La ausencia de la unidad en el maestro de flota ya **NO bloquea** el
+   * cierre: ahora se reporta como una advertencia. Esto cubre órdenes
+   * históricas o de tenants cuya flota aún no se ha sincronizado desde MSSQL.
+   * El resto de las validaciones (síntomas, áreas abiertas, aprobaciones,
+   * despacho, reincidencia, horas) sigue siendo bloqueante.
    */
   public static validateCierre(orden: any, unidad: any) {
     const pendientes: string[] = [];
+    const advertencias: string[] = [];
 
     if (!unidad) {
-      pendientes.push('Falta identificar la unidad vehicular en el maestro de flota.');
+      // Soft warning: la placa no está en el maestro de flota pero la orden
+      // ya existe localmente, así que permitimos cerrarla. La advertencia
+      // queda visible para que el usuario decida si la regulariza después.
+      advertencias.push(
+        `La placa ${orden.placa} no se encontró en el maestro de flota (vw_flota_vehiculos). Se permite el cierre, pero queda pendiente de sincronización.`
+      );
     }
 
     if (!orden.sintomas || !orden.sintomas.trim()) {
@@ -114,6 +126,7 @@ export class OrdenController {
     return {
       puedeCerrar: pendientes.length === 0,
       bloqueos: pendientes,
+      advertencias,
     };
   }
 
@@ -482,6 +495,7 @@ export class OrdenController {
         message: 'Orden de servicio cerrada exitosamente. Liquidación emitida y conciliada con el ERP.',
         data: orden,
         liquidacion: totales,
+        advertencias: validacion.advertencias || [],
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, error: error.message });
