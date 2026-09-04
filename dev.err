@@ -1,4 +1,133 @@
-npm notice run Solicitudes_taller@0.0.0 predev
+﻿node.exe : npm notice run Solicitudes_taller@0.0.0 predev
+En línea: 1 Carácter: 1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\it.desarrollador\AppDa ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run ...er@0.0.0 predev 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
 npm notice run node scripts/ensure-ports.cjs 4000 4100
+[36m[INFO][0m Plataforma: win32 | Puertos objetivo: 4000, 4100
+[32m[OK][0m Puerto 4000 est├í libre.
+[32m[OK][0m Puerto 4100 est├í libre.
+[32m[OK][0m Todos los puertos est├ín disponibles para iniciar la aplicaci├│n.
 npm notice run Solicitudes_taller@0.0.0 dev
-npm notice run tsx server.ts
+npm notice run tsx watch server.ts
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+Ôùç injected env (34) from .env // tip: Ôùê encrypted .env [www.dotenvx.com]
+[16:52:44] [[32minfo[39m] [32m[Database] Conexi├│n establecida exitosamente con dialecto: SQLITE[39m | {"service":"sanluis-backend-api"}
+[16:52:44] [[32minfo[39m] [32m[Seed] Usuarios y asignaciones de todos los roles (9 roles) verificados exitosamente.[39m | {"service":"sanluis-backend-api"}
+[16:52:44] [[32minfo[39m] [32m[Seed] Inicializaci├│n de base de datos completada satisfactoriamente.[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m[Profit MSSQL] Conectado exitosamente a SRVBDPROFITBK/AD_TRANS con usuario solicitudweb[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m[Profit Mirror] Esquema SQLite espejo listo (./data/profit_ad_trans.sqlite).[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m[Profit Mirror] Modo MSSQL activo. El espejo se poblar├í desde el servidor remoto v├¡a MasterSyncService.[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m[SyncService] ÔÅ▒´©Å Iniciando servicio de sincronizaci├│n peri├│dica cada 15s[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m[MasterSyncService] ÔÅ▒´©Å Sincronizaci├│n maestra bidireccional cada 30s[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[33mwarn[39m] [33m[GastosService] Art├¡culo FIL-0112 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[33mwarn[39m] [33m[GastosService] Art├¡culo PAS-0301 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m[GastosBootstrap] Tabla gastos OK. Backfill: processed=6 created=0 updated=2 skipped=4[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m­ƒÜ£ [San Luis Backend] Servidor Express activo en puerto 4000[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m­ƒôÜ Swagger UI disponible en: http://localhost:4000/api-docs[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m­ƒôä Especificaci├│n JSON en: http://localhost:4000/api-docs-json[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m­ƒÅÑ Healthcheck: http://localhost:4000/health[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[16:52:45] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[16:52:46] [[32minfo[39m] [32m[SyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional (Local <-> MSSQL Profit Plus)...[39m | {"service":"sanluis-backend-api"}
+[16:52:46] [[32minfo[39m] [32m[GastosService] Sync MSSQL: pendientes=2 cols_escribibles=12 claves_upsert=[codigo_articulo][39m | {"service":"sanluis-backend-api"}
+[16:52:46] [[32minfo[39m] [32m[GastosService] Sync MSSQL: attempted=2 inserted=0 failed=2 (1173ms)[39m | {"service":"sanluis-backend-api"}
+[16:52:46] [[32minfo[39m] [32m[GastosSyncBg] attempt=2 inserted=0 failed=2 (1173ms)[39m | {"service":"sanluis-backend-api"}
+[16:52:48] [[32minfo[39m] [32m[SyncService] Ô£à Sincronizaci├│n completada en 2853ms. Salida enviada: 0, Fallidas: 0, Entrada actualizada: 100, Pendientes restantes: 0[39m | {"service":"sanluis-backend-api"}
+[16:52:49] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 3743ms.[39m | {"service":"sanluis-backend-api"}
+[16:53:15] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[16:53:17] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 2320ms.[39m | {"service":"sanluis-backend-api"}
+[16:53:45] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[16:53:45] [[32minfo[39m] [32m[GastosService] Sync MSSQL: pendientes=2 cols_escribibles=12 claves_upsert=[codigo_articulo][39m | {"service":"sanluis-backend-api"}
+[16:53:46] [[32minfo[39m] [32m[GastosService] Sync MSSQL: attempted=2 inserted=0 failed=2 (609ms)[39m | {"service":"sanluis-backend-api"}
+[16:53:46] [[32minfo[39m] [32m[GastosSyncBg] attempt=2 inserted=0 failed=2 (609ms)[39m | {"service":"sanluis-backend-api"}
+[16:53:50] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 4804ms.[39m | {"service":"sanluis-backend-api"}
+16:53:53 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+16:54:08 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+16:54:13 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+16:54:17 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+16:54:20 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+16:54:38 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+16:54:40 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+16:54:57 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+16:55:10 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+Ôùç injected env (34) from .env // tip: Ôîÿ enable debugging { debug: true }
+[16:55:28] [[32minfo[39m] [32m[Database] Conexi├│n establecida exitosamente con dialecto: SQLITE[39m | {"service":"sanluis-backend-api"}
+[16:55:28] [[32minfo[39m] [32m[Seed] Usuarios y asignaciones de todos los roles (9 roles) verificados exitosamente.[39m | {"service":"sanluis-backend-api"}
+[16:55:28] [[32minfo[39m] [32m[Seed] Inicializaci├│n de base de datos completada satisfactoriamente.[39m | {"service":"sanluis-backend-api"}
+[16:55:29] [[32minfo[39m] [32m[Profit MSSQL] Conectado exitosamente a SRVBDPROFITBK/AD_TRANS con usuario solicitudweb[39m | {"service":"sanluis-backend-api"}
+[16:55:29] [[32minfo[39m] [32m[Profit Mirror] Esquema SQLite espejo listo (./data/profit_ad_trans.sqlite).[39m | {"service":"sanluis-backend-api"}
+[16:55:29] [[32minfo[39m] [32m[Profit Mirror] Modo MSSQL activo. El espejo se poblar├í desde el servidor remoto v├¡a MasterSyncService.[39m | {"service":"sanluis-backend-api"}
+[16:55:29] [[32minfo[39m] [32m[SyncService] ÔÅ▒´©Å Iniciando servicio de sincronizaci├│n peri├│dica cada 15s[39m | {"service":"sanluis-backend-api"}
+[16:55:29] [[32minfo[39m] [32m[MasterSyncService] ÔÅ▒´©Å Sincronizaci├│n maestra bidireccional cada 30s[39m | {"service":"sanluis-backend-api"}
+[16:55:29] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:55:29] [[33mwarn[39m] [33m[GastosService] Art├¡culo FIL-0112 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:55:29] [[33mwarn[39m] [33m[GastosService] Art├¡culo PAS-0301 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:55:30] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:55:30] [[32minfo[39m] [32m[GastosBootstrap] Tabla gastos OK. Backfill: processed=6 created=0 updated=2 skipped=4[39m | {"service":"sanluis-backend-api"}
+[16:55:30] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[16:55:30] [[32minfo[39m] [32m­ƒÜ£ [San Luis Backend] Servidor Express activo en puerto 4000[39m | {"service":"sanluis-backend-api"}
+[16:55:30] [[32minfo[39m] [32m­ƒôÜ Swagger UI disponible en: http://localhost:4000/api-docs[39m | {"service":"sanluis-backend-api"}
+[16:55:30] [[32minfo[39m] [32m­ƒôä Especificaci├│n JSON en: http://localhost:4000/api-docs-json[39m | {"service":"sanluis-backend-api"}
+[16:55:30] [[32minfo[39m] [32m­ƒÅÑ Healthcheck: http://localhost:4000/health[39m | {"service":"sanluis-backend-api"}
+[16:55:30] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[16:55:30] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[16:55:31] [[32minfo[39m] [32m[SyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional (Local <-> MSSQL Profit Plus)...[39m | {"service":"sanluis-backend-api"}
+[16:55:33] [[32minfo[39m] [32m[GastosService] Sync MSSQL: pendientes=2 cols_escribibles=12 claves_upsert=[codigo_articulo][39m | {"service":"sanluis-backend-api"}
+[16:55:38] [[33mwarn[39m] [33m[GastosService] gasto 1 fall├│: Conversion failed when converting date and/or time from character string.[39m | {"service":"sanluis-backend-api"}
+[16:55:38] [[32minfo[39m] [32m[SyncService] Ô£à Sincronizaci├│n completada en 8824ms. Salida enviada: 0, Fallidas: 0, Entrada actualizada: 100, Pendientes restantes: 0[39m | {"service":"sanluis-backend-api"}
+[16:55:39] [[33mwarn[39m] [33m[GastosService] gasto 2 fall├│: Conversion failed when converting date and/or time from character string.[39m | {"service":"sanluis-backend-api"}
+[16:55:39] [[32minfo[39m] [32m[GastosService] Sync MSSQL: attempted=2 inserted=0 failed=2 (9127ms)[39m | {"service":"sanluis-backend-api"}
+[16:55:39] [[32minfo[39m] [32m[GastosSyncBg] attempt=2 inserted=0 failed=2 (9127ms)[39m | {"service":"sanluis-backend-api"}
+[16:55:40] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 11150ms.[39m | {"service":"sanluis-backend-api"}
+[16:55:59] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[16:55:59] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 400ms.[39m | {"service":"sanluis-backend-api"}
+[16:56:29] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[16:56:30] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 620ms.[39m | {"service":"sanluis-backend-api"}
+[16:56:30] [[32minfo[39m] [32m[GastosService] Sync MSSQL: pendientes=2 cols_escribibles=12 claves_upsert=[codigo_articulo][39m | {"service":"sanluis-backend-api"}
+[16:56:30] [[33mwarn[39m] [33m[GastosService] gasto 1 fall├│: Conversion failed when converting date and/or time from character string.[39m | {"service":"sanluis-backend-api"}
+[16:56:30] [[33mwarn[39m] [33m[GastosService] gasto 2 fall├│: Conversion failed when converting date and/or time from character string.[39m | {"service":"sanluis-backend-api"}
+[16:56:30] [[32minfo[39m] [32m[GastosService] Sync MSSQL: attempted=2 inserted=0 failed=2 (526ms)[39m | {"service":"sanluis-backend-api"}
+[16:56:30] [[32minfo[39m] [32m[GastosSyncBg] attempt=2 inserted=0 failed=2 (526ms)[39m | {"service":"sanluis-backend-api"}
+16:56:32 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+16:56:34 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+Ôùç injected env (34) from .env // tip: Ôîÿ custom filepath { path: '/custom/path/.env' }
+[16:56:47] [[32minfo[39m] [32m[Database] Conexi├│n establecida exitosamente con dialecto: SQLITE[39m | {"service":"sanluis-backend-api"}
+[16:56:47] [[32minfo[39m] [32m[Seed] Usuarios y asignaciones de todos los roles (9 roles) verificados exitosamente.[39m | {"service":"sanluis-backend-api"}
+[16:56:47] [[32minfo[39m] [32m[Seed] Inicializaci├│n de base de datos completada satisfactoriamente.[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m[Profit MSSQL] Conectado exitosamente a SRVBDPROFITBK/AD_TRANS con usuario solicitudweb[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m[Profit Mirror] Esquema SQLite espejo listo (./data/profit_ad_trans.sqlite).[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m[Profit Mirror] Modo MSSQL activo. El espejo se poblar├í desde el servidor remoto v├¡a MasterSyncService.[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m[SyncService] ÔÅ▒´©Å Iniciando servicio de sincronizaci├│n peri├│dica cada 15s[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m[MasterSyncService] ÔÅ▒´©Å Sincronizaci├│n maestra bidireccional cada 30s[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[33mwarn[39m] [33m[GastosService] Art├¡culo FIL-0112 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[33mwarn[39m] [33m[GastosService] Art├¡culo PAS-0301 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m[GastosBootstrap] Tabla gastos OK. Backfill: processed=6 created=0 updated=2 skipped=4[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m­ƒÜ£ [San Luis Backend] Servidor Express activo en puerto 4000[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m­ƒôÜ Swagger UI disponible en: http://localhost:4000/api-docs[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m­ƒôä Especificaci├│n JSON en: http://localhost:4000/api-docs-json[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m­ƒÅÑ Healthcheck: http://localhost:4000/health[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[16:56:48] [[32minfo[39m] [32m[SyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional (Local <-> MSSQL Profit Plus)...[39m | {"service":"sanluis-backend-api"}
+[16:56:49] [[32minfo[39m] [32m[GastosService] Sync MSSQL: pendientes=2 cols_escribibles=12 claves_upsert=[codigo_articulo][39m | {"service":"sanluis-backend-api"}
+[16:56:50] [[32minfo[39m] [32m[SyncService] Ô£à Sincronizaci├│n completada en 1456ms. Salida enviada: 0, Fallidas: 0, Entrada actualizada: 100, Pendientes restantes: 0[39m | {"service":"sanluis-backend-api"}
+[16:56:50] [[32minfo[39m] [32m[GastosService] Sync MSSQL: attempted=2 inserted=2 failed=0 (1866ms)[39m | {"service":"sanluis-backend-api"}
+[16:56:50] [[32minfo[39m] [32m[GastosSyncBg] attempt=2 inserted=2 failed=0 (1866ms)[39m | {"service":"sanluis-backend-api"}
+[16:56:51] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 2784ms.[39m | {"service":"sanluis-backend-api"}
+[16:57:18] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[16:57:19] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 901ms.[39m | {"service":"sanluis-backend-api"}

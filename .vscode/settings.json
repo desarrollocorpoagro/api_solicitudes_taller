@@ -19,6 +19,18 @@
         "/^netstat -ano 2>&1 \\| Select-String \":4000\\.\\*LISTENING\" \\| ForEach-Object \\{ \\(\\$_ -split '\\\\s\\+'\\)\\[-1\\] \\} \\| Sort-Object -Unique \\| ForEach-Object \\{ cmd\\.exe /c \"taskkill /F /PID \\$_\" 2>&1 \\}; sleep 3; echo \"OK\"$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^npm run dev 2>&1 \\| Out-File -FilePath dev\\.err -Encoding utf8$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node scripts/probe-date-merge\\.cjs$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^Start-Sleep -Seconds 100; node scripts/inspect-gastos-err\\.cjs 2>\\$null$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     },
     "chat.byokUtilityModelDefault": "mainAgent",

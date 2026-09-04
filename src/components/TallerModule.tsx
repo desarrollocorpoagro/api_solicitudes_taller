@@ -2046,10 +2046,20 @@ export const TallerModule: React.FC<{
             </label>
             <label className="f">
               <span className="req">Recibe conforme</span>
-              <input
+              <Autocomplete
                 value={recibeConforme}
-                onChange={(e) => setRecibeConforme(e.target.value)}
-                placeholder="Nombre de quien retira la unidad"
+                onChange={setRecibeConforme}
+                options={vendedoresList.map((v) => ({
+                  value: v.ven_des ?? v.co_ven,
+                  label: v.ven_des ?? v.co_ven,
+                  subLabel: [v.co_ven, v.cedula].filter(Boolean).join(' • '),
+                }))}
+                placeholder="Nombre de quien retira la unidad (autocomplete de vw_flota_vendedores)"
+                emptyMessage={
+                  vendedoresLoading
+                    ? 'Cargando vendedores desde vw_flota_vendedores…'
+                    : 'Sin resultados. Escribe para crear uno nuevo.'
+                }
               />
             </label>
           </div>
