@@ -18,6 +18,7 @@ export interface GastoAttributes {
   fecha_create?: Date | null;
   ordenId?: string | null;
   solicitudId?: string | null;
+  placa?: string | null;
   syncedToMssql?: boolean;
   mssqlSyncedAt?: Date | null;
   mssqlError?: string | null;
@@ -44,6 +45,7 @@ export interface GastoCreationAttributes
     | 'fecha_create'
     | 'ordenId'
     | 'solicitudId'
+    | 'placa'
     | 'syncedToMssql'
     | 'mssqlSyncedAt'
     | 'mssqlError'
@@ -69,6 +71,7 @@ export class Gasto
   public fecha_create!: Date | null;
   public ordenId!: string | null;
   public solicitudId!: string | null;
+  public placa!: string | null;
   public syncedToMssql!: boolean;
   public mssqlSyncedAt!: Date | null;
   public mssqlError!: string | null;
@@ -152,6 +155,11 @@ export function initGastoModel(seq: Sequelize) {
       solicitudId: {
         type: DataTypes.STRING(50),
         allowNull: true,
+      },
+      placa: {
+        type: DataTypes.STRING(30),
+        allowNull: true,
+        defaultValue: '',
       },
       syncedToMssql: {
         type: DataTypes.BOOLEAN,

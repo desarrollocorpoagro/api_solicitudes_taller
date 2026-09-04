@@ -195,6 +195,7 @@ async function ensureGastosTableAndBackfill() {
         fecha_create DATETIME,
         ordenId VARCHAR(50),
         solicitudId VARCHAR(50),
+        placa VARCHAR(30) DEFAULT '',
         syncedToMssql TINYINT(1) DEFAULT 0,
         mssqlSyncedAt DATETIME,
         mssqlError VARCHAR(500),
@@ -202,6 +203,21 @@ async function ensureGastosTableAndBackfill() {
         updatedAt DATETIME
       )`
     );
+    // Migración idempotente: añadir columna placa a tablas existentes que
+    // fueron creadas antes de este cambio. SQLite no soporta IF NOT EXISTS
+    // en ALTER TABLE ADD COLUMN, por lo que comprobamos antes en information_schema.
+    try {
+      const [cols]: any = await sequelize.query(
+        `SELECT LOWER(name) AS name FROM pragma_table_info('gastos')`
+      );
+      const hasPlaca = (cols ?? []).some((c: any) => String(c.name).toLowerCase() === 'placa');
+      if (!hasPlaca) {
+        await sequelize.query(`ALTER TABLE gastos ADD COLUMN placa VARCHAR(30) DEFAULT ''`);
+        logger.info(`[GastosBootstrap] Migración: columna 'placa' agregada a tabla gastos.`);
+      }
+    } catch (migErr: any) {
+      logger.warn(`[GastosBootstrap] No se pudo verificar/agregar columna placa: ${migErr.message}`);
+    }
     const { backfillGastosForOpenOrders } = await import('./src/backend/services/gastos.service');
     const summary = await backfillGastosForOpenOrders();
     logger.info(

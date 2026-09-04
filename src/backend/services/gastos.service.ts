@@ -79,6 +79,10 @@ export async function ensureLocalGastoForSolicitud(
   const costoUnitario = Number(articulo.costo ?? solicitud.costoUnitario ?? 0);
   const total = calcTotal(cantidad, costoUnitario, horas);
 
+  // Resolver la placa vehicular desde la orden padre (validada contra flota_vehiculos).
+  // Queda en blanco por defecto si la orden no tiene placa asignada.
+  const placa = (orden.placa ?? '').toString().trim();
+
   const [gasto, created] = await Gasto.findOrCreate({
     where: { solicitudId: solicitud.id },
     defaults: {
@@ -97,6 +101,7 @@ export async function ensureLocalGastoForSolicitud(
       usuario: opts.usuario ?? '',
       nota: opts.nota ?? '',
       fecha_create: new Date(),
+      placa,
       syncedToMssql: false,
     },
   });
@@ -110,6 +115,7 @@ export async function ensureLocalGastoForSolicitud(
     gasto.costo_unitario = costoUnitario;
     gasto.costo_total_calculado = total;
     gasto.fecha_actividad = new Date();
+    gasto.placa = placa || gasto.placa || '';
     gasto.syncedToMssql = false;
     gasto.mssqlError = null;
     await gasto.save();
@@ -207,6 +213,7 @@ export async function syncGastosToMssql(opts: { limit?: number } = {}): Promise<
     'fecha_create',
     'ordenId',
     'solicitudId',
+    'placa',
   ];
   const writeableCols = localWriteable.filter((c) => mssqlColumns.has(c));
 
@@ -381,6 +388,7 @@ async function upsertGastoToMssql(
     fecha_create: gasto.fecha_create ?? new Date(),
     ordenId: gasto.ordenId ?? null,
     solicitudId: gasto.solicitudId ?? null,
+    placa: gasto.placa ?? '',
   };
 
   const values = writeableCols.map((c) =>

@@ -1749,3 +1749,550 @@ npm notice run tsx watch server.ts
 [2m17:13:59[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
 [17:14:00] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
 [2m17:14:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:00] [[32mhttp[39m] [32mGET / 200 - - 27.440 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:00] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.958 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:00] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556440225 200 - - 0.704 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:00] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.051 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:00] [[32mhttp[39m] [32mGET /src/index.css?t=1788556438626 - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:00] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 34.097 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:00] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.097 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:00] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.079 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:01[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:01] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.085 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:01] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.483 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:01] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.056 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:01] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 1.110 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:01] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.065 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:01] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.075 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:01] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.216 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:01] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.080 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:01] [[32mhttp[39m] [32mGET /api/v1/sync/status 200 333 - 58.254 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:02] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.100 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:02] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.220 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:02] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.170 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:02[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:03] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:03[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:03] [[32mhttp[39m] [32mGET / 200 - - 299.535 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:04[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:04] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:04[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:04] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:04[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:04] [[32mhttp[39m] [32mGET / 200 - - 32.044 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:05] [[32mhttp[39m] [32mGET /src/index.css?t=1788556440294 200 - - 4195.608 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:05] [[32mhttp[39m] [32mGET / 200 - - 330.056 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:05] [[32mhttp[39m] [32mGET / 200 - - 184.552 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:05] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react_jsx-dev-runtime.js.map 304 - - 31.935 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:05] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/chunk-UWNBZXXB.js.map 304 - - 32.374 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:05] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react-dom_client.js.map 304 - - 50.121 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:06[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:06] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:14:06] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/lucide-react.js.map 304 - - 399.325 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:06] [[32mhttp[39m] [32mGET / 200 - - 153.647 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:06[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:06] [[32mhttp[39m] [32mGET /api/v1/sync/status 200 332 - 5.886 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:06[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[2m17:14:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:07] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:14:07] [[32mhttp[39m] [32mGET / 200 - - 82.338 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556447220 200 - - 0.347 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.152 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.053 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 6.190 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.116 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/index.css?t=1788556447220 200 - - 0.235 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.212 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.103 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.098 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.137 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.050 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.041 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.142 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.128 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.082 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.081 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.163 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:08] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.651 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:09] [[32mhttp[39m] [32mGET /favicon.svg 304 - - 0.561 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:09] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/chunk-UWNBZXXB.js.map 304 - - 4.404 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:09] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react_jsx-dev-runtime.js.map 304 - - 79.074 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:09] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/lucide-react.js.map 304 - - 77.339 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:09] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react-dom_client.js.map 304 - - 175.352 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:11] [[32mhttp[39m] [32mGET /api/v1/sync/status 200 332 - 10.342 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:12] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:14:12] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 640ms.[39m | {"service":"sanluis-backend-api"}
+[2m17:14:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:15] [[32mhttp[39m] [32mGET / 200 - - 6.782 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:15] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.171 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:15] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556455139 200 - - 0.549 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:16] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.084 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:16] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 32.328 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:16] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.435 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:16] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.095 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:16] [[32mhttp[39m] [32mGET /api/v1/sync/status 200 333 - 91.349 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:16] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.088 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:16] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.052 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:16] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.037 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:16] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.037 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:16] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.032 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:17] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.079 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:17] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.222 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:17] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.057 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:17] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.056 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:17] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.081 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:17] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.243 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[2m17:14:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:17] [[32mhttp[39m] [32mGET / 200 - - 35.596 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:18] [[32mhttp[39m] [32mGET /src/index.css?t=1788556455978 200 - - 2722.415 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:18] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556457716 200 - - 0.552 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:18] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.259 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:18] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.078 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[2m17:14:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:18] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.148 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:18] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.089 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 217.019 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:19[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.163 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.054 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.057 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.048 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:19[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.095 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.084 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.040 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.035 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.415 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.122 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:19] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.143 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:19[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:19] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:19[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:20] [[32mhttp[39m] [32mGET / 200 - - 18.922 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:20] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556459978 200 - - 0.259 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:20] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.147 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:20] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.042 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:20] [[32mhttp[39m] [32mGET /src/index.css?t=1788556457794 - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:14:20] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.904 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:20] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 284.115 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:20] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.113 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[2m17:14:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.112 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.075 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.070 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.134 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.125 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.133 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.051 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.260 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 17.560 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.714 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.205 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:14:21] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:21] [[32mhttp[39m] [32mGET /api/v1/sync/status 200 334 - 216.034 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:22] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:22] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[2m17:14:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:22] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:23[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:23] [[32mhttp[39m] [32mGET /src/index.css?t=1788556459978 200 - - 2642.539 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:23] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:23[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[2m17:14:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:24] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:14:24] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react_jsx-dev-runtime.js.map 304 - - 732.447 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:24] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/chunk-UWNBZXXB.js.map 304 - - 41.497 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:24] [[32mhttp[39m] [32mGET / 200 - - 43.343 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:24] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react-dom_client.js.map 304 - - 157.614 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[2m17:14:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:25] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:14:25] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/lucide-react.js.map 304 - - 1071.073 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:25] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:14:25] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[2m17:14:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:26] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:26] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:27] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:27] [[32mhttp[39m] [32mGET / 200 - - 203.125 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:27] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:14:27] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react_jsx-dev-runtime.js.map 304 - - 300.656 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:27] [[32mhttp[39m] [32mGET / 200 - - 33.488 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:27] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/chunk-UWNBZXXB.js.map 304 - - 33.237 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:28] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react-dom_client.js.map 304 - - 400.871 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:28] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556467966 200 - - 0.557 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:28] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.124 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:28] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.044 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:28] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.091 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:28] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.057 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:28] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.146 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:28] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.093 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:28] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.179 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:29] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 648.580 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:29] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.082 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:29] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.067 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:29] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.092 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:29] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.073 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:29] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.075 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:29] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.045 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:29] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.040 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:29] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/lucide-react.js.map 304 - - 1337.143 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:29] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.179 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:29] [[32mhttp[39m] [32mGET / 200 - - 278.438 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:29] [[32mhttp[39m] [32mGET / 200 - - 29.350 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556469647 200 - - 0.266 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.125 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.036 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/index.css?t=1788556468367 - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:30] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 29.778 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.209 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.085 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:14:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.096 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.124 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 1.092 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.127 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.081 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.133 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 4.151 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.163 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.132 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.192 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.422 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /src/index.css?t=1788556469647 200 - - 285.722 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react_jsx-dev-runtime.js.map 304 - - 8.341 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/chunk-UWNBZXXB.js.map 304 - - 9.547 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react-dom_client.js.map 304 - - 28.255 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/lucide-react.js.map 304 - - 80.283 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:30] [[32mhttp[39m] [32mGET /favicon.svg 304 - - 0.438 ms[39m | {"service":"sanluis-backend-api"}
+[17:14:42] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:14:43] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 968ms.[39m | {"service":"sanluis-backend-api"}
+[17:15:12] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:15:12] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 449ms.[39m | {"service":"sanluis-backend-api"}
+[17:15:42] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:15:42] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 356ms.[39m | {"service":"sanluis-backend-api"}
+[17:16:12] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:16:12] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 408ms.[39m | {"service":"sanluis-backend-api"}
+[17:16:42] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:16:42] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 366ms.[39m | {"service":"sanluis-backend-api"}
+[2m17:16:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:46] [[32mhttp[39m] [32mGET / 200 - - 6.305 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:46] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556606059 200 - - 1.266 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:46] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.366 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:46] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.118 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:46] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.081 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:46] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.104 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:46] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.080 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:46] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 240.414 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:46] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.874 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.093 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.093 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.133 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.073 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.051 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.093 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.067 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.047 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.181 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET / 200 - - 8.159 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/index.css?t=1788556606676 200 - - 490.684 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:47] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556607054 200 - - 0.651 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.166 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.058 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.048 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:47] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.063 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 48.707 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.105 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.160 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.062 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.155 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.089 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.081 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.092 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.059 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.059 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.038 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:47] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.134 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:48] [[32mhttp[39m] [32mGET / 200 - - 10.472 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/index.css?t=1788556607516 200 - - 573.301 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:48] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556608106 200 - - 0.537 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.195 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.048 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.069 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.090 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.144 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.070 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 83.024 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.080 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.065 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.051 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.087 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.197 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.154 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.074 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.051 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:48] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.302 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:48] [[32mhttp[39m] [32mGET /src/index.css?t=1788556608367 200 - - 264.378 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:48] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react_jsx-dev-runtime.js.map 304 - - 6.299 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:48] [[32mhttp[39m] [32mGET /favicon.svg 304 - - 0.589 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:48] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react-dom_client.js.map 304 - - 125.379 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:49] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/chunk-UWNBZXXB.js.map 304 - - 141.080 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:49] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/lucide-react.js.map 304 - - 245.421 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:49] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:49] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:16:49] [[32mhttp[39m] [32mGET / 200 - - 41.600 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:50] [[32mhttp[39m] [32mGET / 200 - - 83.054 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556610183 200 - - 0.260 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.181 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:50] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.082 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.055 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.049 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react_jsx-dev-runtime.js.map 304 - - 38.210 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 203.137 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.405 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.173 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/chunk-UWNBZXXB.js.map 304 - - 192.518 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:50] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.066 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.050 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.092 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react-dom_client.js.map 304 - - 274.353 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.114 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.073 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:50] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.043 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:51] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.093 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:51] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.048 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:51] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.134 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:51] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:51] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:51] [[32mhttp[39m] [32mGET / 200 - - 38.237 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:51] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/lucide-react.js.map 304 - - 348.526 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:51] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:51] [[32mhttp[39m] [32mGET /src/index.css?t=1788556610183 200 - - 1303.965 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:51] [[32mhttp[39m] [32mGET / 200 - - 25.790 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556611952 200 - - 0.444 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.133 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:52] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.101 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.076 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:52] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 137.831 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 1.059 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.092 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.173 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.044 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.053 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.049 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.048 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.042 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.085 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.089 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.062 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:52] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.222 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET / 200 - - 55.394 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:52] [[32mhttp[39m] [32mGET /src/index.css?t=1788556611952 200 - - 476.907 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.188 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556612594 200 - - 0.260 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.052 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:53] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.098 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 35.328 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 0.081 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.086 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.055 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.955 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.064 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 1.199 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.054 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.657 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.060 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.082 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.191 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.055 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /src/index.css?t=1788556612594 200 - - 167.040 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react_jsx-dev-runtime.js.map 304 - - 6.023 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:53] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react-dom_client.js.map 304 - - 33.869 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/chunk-UWNBZXXB.js.map 304 - - 34.676 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:53] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/lucide-react.js.map 304 - - 125.432 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:16:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[2m17:16:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdev.err[22m
+[17:16:53] [[32mhttp[39m] [32mGET / 200 - - 130.099 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:54] [[32mhttp[39m] [32mGET / - - - - ms[39m | {"service":"sanluis-backend-api"}
+[17:16:54] [[32mhttp[39m] [32mGET / 200 - - 40.785 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/main.tsx?t=1788556613782 200 - - 0.409 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /@vite/client 304 - - 0.212 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /@react-refresh 304 - - 0.191 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /.well-known/appspecific/com.chrome.devtools.json 200 - - 4.791 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/index.css?t=1788556613782 200 - - 1.212 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /node_modules/vite/dist/client/env.mjs 304 - - 0.170 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/App.tsx 304 - - 9.551 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/LoginScreen.tsx 304 - - 0.109 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/TallerModule.tsx 304 - - 0.068 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/UserManagementModule.tsx 304 - - 0.047 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/SwaggerModule.tsx 304 - - 0.045 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/NotificationsModule.tsx 304 - - 0.291 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/MultimediaModule.tsx 304 - - 0.135 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/TestConsoleModule.tsx 304 - - 0.076 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/SyncStatusBadge.tsx 304 - - 0.051 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/RoleSimulatorBar.tsx 304 - - 0.044 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/SanLuisLogo.tsx 304 - - 0.130 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /src/components/OrdenAuditHistory.tsx 304 - - 0.626 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/chunk-UWNBZXXB.js.map 304 - - 38.767 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react-dom_client.js.map 304 - - 62.799 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/react_jsx-dev-runtime.js.map 304 - - 65.732 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /node_modules/.vite/deps/lucide-react.js.map 304 - - 165.492 ms[39m | {"service":"sanluis-backend-api"}
+[17:16:55] [[32mhttp[39m] [32mGET /favicon.svg 304 - - 0.616 ms[39m | {"service":"sanluis-backend-api"}
+[2m17:17:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/backend/models/Gasto.model.ts[22m
+17:17:07 [tsx] change in ./src\backend\models\Gasto.model.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+17:17:17 [tsx] change in ./server.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+Ôùç injected env (34) from .env // tip: Ôîÿ multiple files { path: ['.env.local', '.env'] }
+[17:17:29] [[32minfo[39m] [32m[Database] Conexi├│n establecida exitosamente con dialecto: SQLITE[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m[Seed] Usuarios y asignaciones de todos los roles (9 roles) verificados exitosamente.[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m[Seed] Inicializaci├│n de base de datos completada satisfactoriamente.[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m[Profit MSSQL] Conectado exitosamente a SRVBDPROFITBK/AD_TRANS con usuario solicitudweb[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m[Profit Mirror] Esquema SQLite espejo listo (./data/profit_ad_trans.sqlite).[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m[Profit Mirror] Modo MSSQL activo. El espejo se poblar├í desde el servidor remoto v├¡a MasterSyncService.[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m[SyncService] ÔÅ▒´©Å Iniciando servicio de sincronizaci├│n peri├│dica cada 15s[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m[MasterSyncService] ÔÅ▒´©Å Sincronizaci├│n maestra bidireccional cada 30s[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m[GastosBootstrap] Migraci├│n: columna 'placa' agregada a tabla gastos.[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[33mwarn[39m] [33m[GastosService] Art├¡culo FIL-0112 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[33mwarn[39m] [33m[GastosService] Art├¡culo PAS-0301 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m[GastosBootstrap] Tabla gastos OK. Backfill: processed=6 created=0 updated=2 skipped=4[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m­ƒÜ£ [San Luis Backend] Servidor Express activo en puerto 4000[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m­ƒôÜ Swagger UI disponible en: http://localhost:4000/api-docs[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m­ƒôä Especificaci├│n JSON en: http://localhost:4000/api-docs-json[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m­ƒÅÑ Healthcheck: http://localhost:4000/health[39m | {"service":"sanluis-backend-api"}
+[17:17:29] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[17:17:30] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:17:30] [[32minfo[39m] [32m[SyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional (Local <-> MSSQL Profit Plus)...[39m | {"service":"sanluis-backend-api"}
+[17:17:31] [[32minfo[39m] [32m[GastosService] Sync MSSQL: pendientes=2 cols_escribibles=12 claves_upsert=[codigo_articulo][39m | {"service":"sanluis-backend-api"}
+[17:17:31] [[32minfo[39m] [32m[SyncService] Ô£à Sincronizaci├│n completada en 1890ms. Salida enviada: 0, Fallidas: 0, Entrada actualizada: 100, Pendientes restantes: 0[39m | {"service":"sanluis-backend-api"}
+17:17:31 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+Ôùç injected env (34) from .env // tip: Ôîÿ custom filepath { path: '/custom/path/.env' }
+[17:17:41] [[32minfo[39m] [32m[Database] Conexi├│n establecida exitosamente con dialecto: SQLITE[39m | {"service":"sanluis-backend-api"}
+[17:17:41] [[32minfo[39m] [32m[Seed] Usuarios y asignaciones de todos los roles (9 roles) verificados exitosamente.[39m | {"service":"sanluis-backend-api"}
+[17:17:41] [[32minfo[39m] [32m[Seed] Inicializaci├│n de base de datos completada satisfactoriamente.[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m[Profit MSSQL] Conectado exitosamente a SRVBDPROFITBK/AD_TRANS con usuario solicitudweb[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m[Profit Mirror] Esquema SQLite espejo listo (./data/profit_ad_trans.sqlite).[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m[Profit Mirror] Modo MSSQL activo. El espejo se poblar├í desde el servidor remoto v├¡a MasterSyncService.[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m[SyncService] ÔÅ▒´©Å Iniciando servicio de sincronizaci├│n peri├│dica cada 15s[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m[MasterSyncService] ÔÅ▒´©Å Sincronizaci├│n maestra bidireccional cada 30s[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[33mwarn[39m] [33m[GastosService] Art├¡culo FIL-0112 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[33mwarn[39m] [33m[GastosService] Art├¡culo PAS-0301 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m[GastosBootstrap] Tabla gastos OK. Backfill: processed=6 created=0 updated=2 skipped=4[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m­ƒÜ£ [San Luis Backend] Servidor Express activo en puerto 4000[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m­ƒôÜ Swagger UI disponible en: http://localhost:4000/api-docs[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m­ƒôä Especificaci├│n JSON en: http://localhost:4000/api-docs-json[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m­ƒÅÑ Healthcheck: http://localhost:4000/health[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:17:42] [[32minfo[39m] [32m[SyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional (Local <-> MSSQL Profit Plus)...[39m | {"service":"sanluis-backend-api"}
+[17:17:43] [[32minfo[39m] [32m[GastosService] Sync MSSQL: pendientes=2 cols_escribibles=12 claves_upsert=[codigo_articulo][39m | {"service":"sanluis-backend-api"}
+17:17:45 [tsx] change in ./server.ts Restarting...
+17:17:51 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+17:17:52 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+17:18:01 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+17:18:02 [tsx] change in ./src\backend\services\gastos.service.ts Restarting...
+[profitDb] INIT user="solicitudweb" pass="solicitudweb" host="SRVBDPROFITBK" port=1433 db="AD_TRANS" dialect=mssql
+Ôùç injected env (34) from .env // tip: Ôîÿ multiple files { path: ['.env.local', '.env'] }
+[17:18:13] [[32minfo[39m] [32m[Database] Conexi├│n establecida exitosamente con dialecto: SQLITE[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[Seed] Usuarios y asignaciones de todos los roles (9 roles) verificados exitosamente.[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[Seed] Inicializaci├│n de base de datos completada satisfactoriamente.[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[Profit MSSQL] Conectado exitosamente a SRVBDPROFITBK/AD_TRANS con usuario solicitudweb[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[Profit Mirror] Esquema SQLite espejo listo (./data/profit_ad_trans.sqlite).[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[Profit Mirror] Modo MSSQL activo. El espejo se poblar├í desde el servidor remoto v├¡a MasterSyncService.[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[SyncService] ÔÅ▒´©Å Iniciando servicio de sincronizaci├│n peri├│dica cada 15s[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[MasterSyncService] ÔÅ▒´©Å Sincronizaci├│n maestra bidireccional cada 30s[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[33mwarn[39m] [33m[GastosService] Art├¡culo FIL-0112 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[33mwarn[39m] [33m[GastosService] Art├¡culo PAS-0301 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[33mwarn[39m] [33m[GastosService] Art├¡culo FRE-0234 no encontrado en vw_flota_articulos; gasto omitido.[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[GastosBootstrap] Tabla gastos OK. Backfill: processed=6 created=0 updated=2 skipped=4[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m­ƒÜ£ [San Luis Backend] Servidor Express activo en puerto 4000[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m­ƒôÜ Swagger UI disponible en: http://localhost:4000/api-docs[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m­ƒôä Especificaci├│n JSON en: http://localhost:4000/api-docs-json[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m­ƒÅÑ Healthcheck: http://localhost:4000/health[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m========================================================[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:18:13] [[32minfo[39m] [32m[SyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional (Local <-> MSSQL Profit Plus)...[39m | {"service":"sanluis-backend-api"}
+[17:18:16] [[32minfo[39m] [32m[GastosService] Sync MSSQL: pendientes=2 cols_escribibles=12 claves_upsert=[codigo_articulo][39m | {"service":"sanluis-backend-api"}
+[17:18:16] [[32minfo[39m] [32m[SyncService] Ô£à Sincronizaci├│n completada en 3052ms. Salida enviada: 0, Fallidas: 0, Entrada actualizada: 100, Pendientes restantes: 0[39m | {"service":"sanluis-backend-api"}
+[17:18:16] [[32minfo[39m] [32m[GastosService] Sync MSSQL: attempted=2 inserted=2 failed=0 (3282ms)[39m | {"service":"sanluis-backend-api"}
+[17:18:16] [[32minfo[39m] [32m[GastosSyncBg] attempt=2 inserted=2 failed=0 (3282ms)[39m | {"service":"sanluis-backend-api"}
+[17:18:17] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 4235ms.[39m | {"service":"sanluis-backend-api"}
+[17:18:43] [[32minfo[39m] [32m[MasterSyncService] ­ƒöä Iniciando sincronizaci├│n bidireccional maestra. MSSQL ­ƒƒó CONECTADO. Entidades: mecanicos, vendedores, articulos, flota_ordenes_servicio, flota_vehiculos[39m | {"service":"sanluis-backend-api"}
+[17:18:46] [[32minfo[39m] [32m[MasterSyncService] Ô£à Sincronizaci├│n maestra completada en 2497ms.[39m | {"service":"sanluis-backend-api"}
