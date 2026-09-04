@@ -5,9 +5,9 @@ const { Sequelize } = require('sequelize');
 const HOST = 'SRVBDPROFITBK';
 const PORT = 1433;
 const DB = 'AD_TRANS';
-const USER = 'fvelazco';
+const USER = 'solicitudweb';
 const CANDIDATES = [
-  'fvelazco', 'fvelazco123', '123', 'Inicio123', 'Inicio123!',
+  'solicitudweb', 'solicitudweb123', '123', 'Inicio123', 'Inicio123!',
   'solicitudweb', 'solicitudweb1', 'solicitud', 'web',
   'profit', 'profit123', 'Profit123', 'admin', 'admin123',
   'sanluis', 'sanluis2026', 'password', 'Password123', 'Password123!',
@@ -54,7 +54,7 @@ const COMMON_OPTS = {
   console.log('\n⚠️  Ninguna contraseña del diccionario funcionó.');
   console.log('   Posibles causas:');
   console.log('   - El servidor no resuelve SRVBDPROFITBK desde tu red actual');
-  console.log('   - El usuario fvelazco no existe en MSSQL');
+  console.log('   - El usuario solicitudweb no existe en MSSQL');
   console.log('   - La contraseña real no está en la lista de candidatos');
   process.exit(1);
 })().catch((e) => {

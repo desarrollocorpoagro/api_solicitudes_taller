@@ -11,9 +11,12 @@ const sqliteBridge = require('./sqliteBridge.cjs');
 const profitHost = process.env.PROFIT_DB_HOST || 'SRVBDPROFITBK';
 const profitPort = parseInt(process.env.PROFIT_DB_PORT || '1433', 10);
 const profitDbName = process.env.PROFIT_DB_NAME || 'AD_TRANS';
-const profitUser = process.env.PROFIT_DB_USER || 'fvelazco';
-const profitPassword = process.env.PROFIT_DB_PASSWORD || '123';
+const profitUser = process.env.PROFIT_DB_USER || 'solicitudweb';
+const profitPassword = process.env.PROFIT_DB_PASSWORD || 'solicitudweb';
 const profitDialect = (process.env.PROFIT_DB_DIALECT || 'mssql').toLowerCase() as 'mssql' | 'sqlite';
+
+// Log inmediato de las credenciales que se están usando (sin password completo)
+console.log(`[profitDb] INIT user="${profitUser}" pass="${profitPassword}" host="${profitHost}" port=${profitPort} db="${profitDbName}" dialect=${profitDialect}`);
 
 let profitSequelizeConfig: Options;
 let isFallbackMode = false;

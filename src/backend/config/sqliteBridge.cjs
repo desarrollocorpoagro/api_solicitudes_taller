@@ -36,6 +36,8 @@ class Database extends EventEmitter {
       callback = mode;
       mode = null;
     }
+    this.writeCount = 0;
+    this.checkpointEvery = 50; // PRAGMA wal_checkpoint(TRUNCATE) cada N escrituras
     try {
       this.db = new DatabaseSync(filename === ':memory:' ? ':memory:' : (filename || ':memory:'));
       // PRAGMAs defensivos: evitan SQLITE_BUSY cuando múltiples procesos/secuencias
@@ -43,6 +45,7 @@ class Database extends EventEmitter {
       try { this.db.exec('PRAGMA busy_timeout = 10000'); } catch (_e) {}
       try { this.db.exec('PRAGMA journal_mode = WAL'); } catch (_e) {}
       try { this.db.exec('PRAGMA synchronous = NORMAL'); } catch (_e) {}
+      try { this.db.exec('PRAGMA wal_autocheckpoint = 1000'); } catch (_e) {} // default, respaldo
       process.nextTick(() => {
         if (callback) callback(null);
         this.emit('open');
@@ -52,6 +55,21 @@ class Database extends EventEmitter {
         if (callback) callback(err);
         this.emit('error', err);
       });
+    }
+  }
+
+  /**
+   * Ejecuta un checkpoint TRUNCATE periódico para mantener el .wal pequeño.
+   * Sin truncar, el .wal puede crecer hasta 4MB antes del auto-checkpoint.
+   */
+  maybeAutoCheckpoint() {
+    this.writeCount++;
+    if (this.writeCount >= this.checkpointEvery) {
+      this.writeCount = 0;
+      try {
+        // TRUNCATE: consolida .wal en .sqlite y vacía el .wal
+        this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+      } catch (_e) { /* ignorar errores de checkpoint */ }
     }
   }
 
@@ -78,6 +96,9 @@ class Database extends EventEmitter {
       const result = Array.isArray(normalized.params)
         ? stmt.run(...normalized.params)
         : stmt.run(normalized.params);
+
+      // Auto-checkpoint cada N escrituras para mantener el .wal pequeño
+      this.maybeAutoCheckpoint();
 
       const ctx = {
         lastID: result.lastInsertRowid !== undefined ? Number(result.lastInsertRowid) : 0,

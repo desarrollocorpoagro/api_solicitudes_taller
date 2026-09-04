@@ -303,101 +303,101 @@ export const seedInitialData = async () => {
     // 3. Semilla de Flota Vehicular Multi-Tenant
     const flotaCount = await FlotaVehicular.count();
     if (flotaCount === 0) {
-      await FlotaVehicular.bulkCreate([
-        // Empresa 1: TRANSPORTE SAN LUIS DE LARA, C.A.
-        {
-          placa: 'A12BC3D',
-          companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
-          marca: 'Chevrolet NPR',
-          anio: 2019,
-          tipo: 'Camión 5t',
-          empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
-          cc: '3021',
-          km: 184320,
-          qrCode: 'SL-VEH-A12BC3D-3021',
-          historialOsAnterior: 'OS-2026-00089',
-          historialDias: 18,
-          historialArea: 'Reparaciones mayores',
-        },
-        {
-          placa: 'A99ZZ11',
-          companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
-          marca: 'Mack Granite',
-          anio: 2018,
-          tipo: 'Chuto Pesado 30t',
-          empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
-          cc: '3022',
-          km: 310450,
-          qrCode: 'SL-VEH-A99ZZ11-3022',
-        },
-        {
-          placa: 'A44TR88',
-          companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
-          marca: 'Ford Cargo 1721',
-          anio: 2020,
-          tipo: 'Camión Plataforma',
-          empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
-          cc: '3023',
-          km: 215600,
-          qrCode: 'SL-VEH-A44TR88-3023',
-        },
+      // await FlotaVehicular.bulkCreate([
+      //   // Empresa 1: TRANSPORTE SAN LUIS DE LARA, C.A.
+      //   {
+      //     placa: 'A12BC3D',
+      //     companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
+      //     marca: 'Chevrolet NPR',
+      //     anio: 2019,
+      //     tipo: 'Camión 5t',
+      //     empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
+      //     cc: '3021',
+      //     km: 184320,
+      //     qrCode: 'SL-VEH-A12BC3D-3021',
+      //     historialOsAnterior: 'OS-2026-00089',
+      //     historialDias: 18,
+      //     historialArea: 'Reparaciones mayores',
+      //   },
+      //   {
+      //     placa: 'A99ZZ11',
+      //     companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
+      //     marca: 'Mack Granite',
+      //     anio: 2018,
+      //     tipo: 'Chuto Pesado 30t',
+      //     empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
+      //     cc: '3022',
+      //     km: 310450,
+      //     qrCode: 'SL-VEH-A99ZZ11-3022',
+      //   },
+      //   {
+      //     placa: 'A44TR88',
+      //     companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
+      //     marca: 'Ford Cargo 1721',
+      //     anio: 2020,
+      //     tipo: 'Camión Plataforma',
+      //     empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
+      //     cc: '3023',
+      //     km: 215600,
+      //     qrCode: 'SL-VEH-A44TR88-3023',
+      //   },
 
-        // Empresa 2: SAN LUIS TRANSPORTE, C.A.
-        {
-          placa: 'B77XY9Z',
-          companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
-          marca: 'Toyota Hilux 4x4',
-          anio: 2021,
-          tipo: 'Pick-up Campo',
-          empresa: 'SAN LUIS TRANSPORTE, C.A.',
-          cc: '1140',
-          km: 96540,
-          qrCode: 'SL-VEH-B77XY9Z-1140',
-          historialOsAnterior: 'OS-2026-00045',
-          historialDias: 40,
-          historialArea: 'Mantenimiento Preventivo',
-        },
-        {
-          placa: 'B22AG55',
-          companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
-          marca: 'John Deere 6125J',
-          anio: 2022,
-          tipo: 'Tractor Agrícola',
-          empresa: 'SAN LUIS TRANSPORTE, C.A.',
-          cc: '1141',
-          km: 4520,
-          qrCode: 'SL-VEH-B22AG55-1141',
-        },
-        {
-          placa: 'B88CC12',
-          companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
-          marca: 'Chevrolet D-Max',
-          anio: 2020,
-          tipo: 'Pick-up Supervisión',
-          empresa: 'SAN LUIS TRANSPORTE, C.A.',
-          cc: '1142',
-          km: 142100,
-          qrCode: 'SL-VEH-B88CC12-1142',
-        },
+      //   // Empresa 2: SAN LUIS TRANSPORTE, C.A.
+      //   {
+      //     placa: 'B77XY9Z',
+      //     companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
+      //     marca: 'Toyota Hilux 4x4',
+      //     anio: 2021,
+      //     tipo: 'Pick-up Campo',
+      //     empresa: 'SAN LUIS TRANSPORTE, C.A.',
+      //     cc: '1140',
+      //     km: 96540,
+      //     qrCode: 'SL-VEH-B77XY9Z-1140',
+      //     historialOsAnterior: 'OS-2026-00045',
+      //     historialDias: 40,
+      //     historialArea: 'Mantenimiento Preventivo',
+      //   },
+      //   {
+      //     placa: 'B22AG55',
+      //     companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
+      //     marca: 'John Deere 6125J',
+      //     anio: 2022,
+      //     tipo: 'Tractor Agrícola',
+      //     empresa: 'SAN LUIS TRANSPORTE, C.A.',
+      //     cc: '1141',
+      //     km: 4520,
+      //     qrCode: 'SL-VEH-B22AG55-1141',
+      //   },
+      //   {
+      //     placa: 'B88CC12',
+      //     companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
+      //     marca: 'Chevrolet D-Max',
+      //     anio: 2020,
+      //     tipo: 'Pick-up Supervisión',
+      //     empresa: 'SAN LUIS TRANSPORTE, C.A.',
+      //     cc: '1142',
+      //     km: 142100,
+      //     qrCode: 'SL-VEH-B88CC12-1142',
+      //   },
 
         
-      ]);
+      // ]);
       logger.info('[Seed] Maestro de Flota Vehicular poblado exitosamente para todas las empresas.');
     }
 
     // 4. Semilla de Catálogo de Repuestos
     const repuestoCount = await CatalogoRepuesto.count();
     if (repuestoCount === 0) {
-      await CatalogoRepuesto.bulkCreate([
-        { cod: 'FRE-0234', desc: 'Disco de freno delantero', stock: 6, costo: 82.00, almacen: 'TLL-01', categoria: 'Frenos' },
-        { cod: 'ROD-0087', desc: 'Rodamiento de maza delantera', stock: 0, costo: 164.00, almacen: 'TLL-01', categoria: 'Tren Delantero' },
-        { cod: 'FIL-0112', desc: 'Filtro de aceite', stock: 2, costo: 12.40, almacen: 'TLL-01', categoria: 'Filtros' },
-        { cod: 'PAS-0301', desc: 'Juego de pastillas de freno', stock: 11, costo: 48.90, almacen: 'TLL-01', categoria: 'Frenos' },
-        { cod: 'COR-0455', desc: 'Kit de correa de distribución', stock: 1, costo: 1290.00, almacen: 'TLL-01', categoria: 'Motor' },
-        { cod: 'ACE-0010', desc: 'Aceite motor 15W40 (litro)', stock: 80, costo: 6.20, almacen: 'TLL-01', categoria: 'Lubricantes' },
-        { cod: 'FIL-0889', desc: 'Filtro de combustible Diesel R90P', stock: 15, costo: 24.50, almacen: 'TLL-01', categoria: 'Filtros' },
-        { cod: 'HID-0105', desc: 'Aceite hidráulico ISO 68 (galón)', stock: 20, costo: 18.30, almacen: 'TLL-01', categoria: 'Lubricantes' },
-      ]);
+      // await CatalogoRepuesto.bulkCreate([
+      //   { cod: 'FRE-0234', desc: 'Disco de freno delantero', stock: 6, costo: 82.00, almacen: 'TLL-01', categoria: 'Frenos' },
+      //   { cod: 'ROD-0087', desc: 'Rodamiento de maza delantera', stock: 0, costo: 164.00, almacen: 'TLL-01', categoria: 'Tren Delantero' },
+      //   { cod: 'FIL-0112', desc: 'Filtro de aceite', stock: 2, costo: 12.40, almacen: 'TLL-01', categoria: 'Filtros' },
+      //   { cod: 'PAS-0301', desc: 'Juego de pastillas de freno', stock: 11, costo: 48.90, almacen: 'TLL-01', categoria: 'Frenos' },
+      //   { cod: 'COR-0455', desc: 'Kit de correa de distribución', stock: 1, costo: 1290.00, almacen: 'TLL-01', categoria: 'Motor' },
+      //   { cod: 'ACE-0010', desc: 'Aceite motor 15W40 (litro)', stock: 80, costo: 6.20, almacen: 'TLL-01', categoria: 'Lubricantes' },
+      //   { cod: 'FIL-0889', desc: 'Filtro de combustible Diesel R90P', stock: 15, costo: 24.50, almacen: 'TLL-01', categoria: 'Filtros' },
+      //   { cod: 'HID-0105', desc: 'Aceite hidráulico ISO 68 (galón)', stock: 20, costo: 18.30, almacen: 'TLL-01', categoria: 'Lubricantes' },
+      // ]);
       logger.info('[Seed] Catálogo de Repuestos poblado exitosamente.');
     }
 
@@ -502,65 +502,7 @@ export const seedInitialData = async () => {
         requiereEscalamiento: false,
       });
 
-      // Orden 3: Distribuidora Centro C.A.
-      const demoOrder3 = await OrdenServicio.create({
-        id: 'OS-2026-00301',
-        tenantId: comp3 ? comp3.id : '33333333-3333-3333-3333-333333333333',
-        placa: 'C45MN8P',
-        km: 412780,
-        recibidoPor: 'Ing. Carlos Mendoza',
-        entregadoPor: 'Ramón Velásquez (Conductor)',
-        sintomas: 'Fuga de aire en sistema neumático y pérdida de potencia en pendiente.',
-        fotosCount: 2,
-        esReincidencia: false,
-        estado: 'En Proceso',
-        fechaApertura: new Date(),
-        totalRepuestos: 48.90,
-        totalManoObra: 54.00,
-        totalExternos: 45.00,
-        totalGeneral: 147.90,
-      });
-
-      const demoArea3 = await OrdenArea.create({
-        id: 'OT-C1',
-        ordenId: demoOrder3.id,
-        area: 'Sistema Neumático y Frenos',
-        fechaRecepcion: new Date(),
-        mecanico: 'José Ramírez',
-        diagnostico: 'Válvula de cuatro vías con fuga y mangueras desgastadas.',
-        horas: 3,
-        tarifaHora: 18,
-        costoManoObra: 54.00,
-        estado: 'abierta',
-      });
-
-      await SolicitudRepuesto.create({
-        ordenId: demoOrder3.id,
-        otId: demoArea3.id,
-        cod: 'PAS-0301',
-        desc: 'Juego de pastillas de freno',
-        cant: 1,
-        costoUnitario: 48.90,
-        costoTotal: 48.90,
-        stockActual: 11,
-        motivo: 'Desgaste por kilometraje elevado.',
-        estadoAprobacion: 'Pendiente',
-        estadoEntrega: 'Por entregar',
-        almacen: 'TLL-01',
-        requiereEscalamiento: false,
-      });
-
-      await SolicitudExterno.create({
-        ordenId: demoOrder3.id,
-        otId: demoArea3.id,
-        proveedor: 'Rectificadora y Neumática Industrial C.A.',
-        descripcion: 'Calibración y prueba de banco de válvula neumática',
-        conGarantia: false,
-        costoCotizado: 45.00,
-        costoEfectivo: 45.00,
-        estadoAprobacion: 'Pendiente',
-      });
-
+            
       // Semilla inicial de Auditoría y Trazabilidad para OS-2026-00101
       await OrdenAuditLog.bulkCreate([
         {

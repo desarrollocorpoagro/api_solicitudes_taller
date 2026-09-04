@@ -1,10 +1,13 @@
+// Cargar .env ANTES de cualquier import del backend que lea process.env
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import fs from 'fs';
-import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import { createServer as createViteServer } from 'vite';
 
@@ -18,8 +21,6 @@ import { apiRateLimiter } from './src/backend/middlewares/rateLimiter.middleware
 import { SyncService } from './src/backend/services/sync.service';
 import { MasterSyncService } from './src/backend/services/masterSync.service';
 import { runAllUnitTests } from './src/backend/tests/unitTests';
-
-dotenv.config();
 
 async function startServer() {
   const app = express();

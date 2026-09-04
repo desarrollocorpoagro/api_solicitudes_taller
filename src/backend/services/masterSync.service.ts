@@ -221,12 +221,12 @@ export class MasterSyncService {
         for (const [codigo, remote] of remoteMap.entries()) {
           if (!localMap.has(codigo)) {
             try {
-              await MecanicosProfit.create({
-                codigo: remote.codigo,
-                nombre: remote.nombre,
-                cargo: remote.cargo,
-                activo: remote.activo,
-              });
+              // Insertar directamente en el espejo SQLite local (no usar el modelo,
+              // porque MecanicosProfit está bindeado a profitSequelize que apunta a MSSQL)
+              await profitMirrorSequelize.query(
+                `INSERT INTO mecanicos (codigo, nombre, cargo, activo) VALUES (?, ?, ?, ?)`,
+                { replacements: [remote.codigo, remote.nombre, remote.cargo ?? null, remote.activo ? 1 : 0] }
+              );
               report.insertedLocal++;
               logger.info(`[MasterSyncService:mecanicos] ➕ LOCAL ← MSSQL: ${codigo} - ${remote.nombre}`);
             } catch (insertErr: any) {
@@ -241,13 +241,9 @@ export class MasterSyncService {
               Boolean(local?.activo) !== Boolean(remote?.activo);
             if (differs) {
               try {
-                await MecanicosProfit.update(
-                  {
-                    nombre: remote.nombre,
-                    cargo: remote.cargo,
-                    activo: remote.activo,
-                  },
-                  { where: { codigo } }
+                await profitMirrorSequelize.query(
+                  `UPDATE mecanicos SET nombre = ?, cargo = ?, activo = ? WHERE codigo = ?`,
+                  { replacements: [remote.nombre, remote.cargo ?? null, remote.activo ? 1 : 0, codigo] }
                 );
                 report.updatedLocal++;
                 logger.debug(`[MasterSyncService:mecanicos] ✏️ LOCAL actualizado desde MSSQL: ${codigo}`);
@@ -264,6 +260,7 @@ export class MasterSyncService {
         for (const [codigo, local] of localMap.entries()) {
           if (!remoteMap.has(codigo)) {
             try {
+              // Insertar en MSSQL real usando el modelo (que apunta a profitSequelize)
               await MecanicosProfit.create({
                 codigo: local.codigo,
                 nombre: local.nombre,
@@ -339,11 +336,11 @@ export class MasterSyncService {
         for (const [coVen, remote] of remoteMap.entries()) {
           if (!localMap.has(coVen)) {
             try {
-              await VwFlotaVendedores.create({
-                co_ven: remote.co_ven,
-                cedula: remote.cedula,
-                ven_des: remote.ven_des,
-              });
+              // Insertar directamente en el espejo SQLite local
+              await profitMirrorSequelize.query(
+                `INSERT INTO vw_flota_vendedores (co_ven, cedula, ven_des) VALUES (?, ?, ?)`,
+                { replacements: [remote.co_ven, remote.cedula, remote.ven_des] }
+              );
               report.insertedLocal++;
               logger.info(`[MasterSyncService:vendedores] ➕ LOCAL ← MSSQL: ${coVen}`);
             } catch (e: any) {
@@ -356,9 +353,9 @@ export class MasterSyncService {
               String(local?.ven_des || '').trim() !== String(remote?.ven_des || '').trim();
             if (differs) {
               try {
-                await VwFlotaVendedores.update(
-                  { cedula: remote.cedula, ven_des: remote.ven_des },
-                  { where: { co_ven: coVen } }
+                await profitMirrorSequelize.query(
+                  `UPDATE vw_flota_vendedores SET cedula = ?, ven_des = ? WHERE co_ven = ?`,
+                  { replacements: [remote.cedula, remote.ven_des, coVen] }
                 );
                 report.updatedLocal++;
                 logger.debug(`[MasterSyncService:vendedores] ✏️ LOCAL actualizado desde MSSQL: ${coVen}`);
@@ -453,20 +450,19 @@ export class MasterSyncService {
         for (const [codigo, remote] of remoteMap.entries()) {
           if (!localMap.has(codigo)) {
             try {
-              await VwFlotaArticulos.create({
-                codigo_profit: remote.codigo_profit,
-                nombre_producto: remote.nombre_producto,
-                codigo_categoria: remote.codigo_categoria,
-                categoria: remote.categoria,
-                unidad_medida: remote.unidad_medida,
-                costo: remote.costo,
-                tipo: remote.tipo,
-                codigo_subalmacen: remote.codigo_subalmacen,
-                sub_almacen: remote.sub_almacen,
-                codigo_almacen: remote.codigo_almacen,
-                almacen: remote.almacen,
-                stock_act: remote.stock_act,
-              });
+              // Insertar directamente en el espejo SQLite local
+              await profitMirrorSequelize.query(
+                `INSERT INTO vw_flota_articulos
+                  (codigo_profit, nombre_producto, codigo_categoria, categoria, unidad_medida,
+                   costo, tipo, codigo_subalmacen, sub_almacen, codigo_almacen, almacen, stock_act)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                { replacements: [
+                  remote.codigo_profit, remote.nombre_producto, remote.codigo_categoria,
+                  remote.categoria, remote.unidad_medida, remote.costo, remote.tipo,
+                  remote.codigo_subalmacen, remote.sub_almacen, remote.codigo_almacen,
+                  remote.almacen, remote.stock_act
+                ] }
+              );
               report.insertedLocal++;
               logger.info(`[MasterSyncService:articulos] ➕ LOCAL ← MSSQL: ${codigo}`);
             } catch (e: any) {
@@ -482,21 +478,18 @@ export class MasterSyncService {
               parseFloat(String(local?.stock_act || 0)) !== parseFloat(String(remote?.stock_act || 0));
             if (differs) {
               try {
-                await VwFlotaArticulos.update(
-                  {
-                    nombre_producto: remote.nombre_producto,
-                    codigo_categoria: remote.codigo_categoria,
-                    categoria: remote.categoria,
-                    unidad_medida: remote.unidad_medida,
-                    costo: remote.costo,
-                    tipo: remote.tipo,
-                    codigo_subalmacen: remote.codigo_subalmacen,
-                    sub_almacen: remote.sub_almacen,
-                    codigo_almacen: remote.codigo_almacen,
-                    almacen: remote.almacen,
-                    stock_act: remote.stock_act,
-                  },
-                  { where: { codigo_profit: codigo } }
+                await profitMirrorSequelize.query(
+                  `UPDATE vw_flota_articulos SET
+                    nombre_producto = ?, codigo_categoria = ?, categoria = ?, unidad_medida = ?,
+                    costo = ?, tipo = ?, codigo_subalmacen = ?, sub_almacen = ?,
+                    codigo_almacen = ?, almacen = ?, stock_act = ?
+                   WHERE codigo_profit = ?`,
+                  { replacements: [
+                    remote.nombre_producto, remote.codigo_categoria, remote.categoria,
+                    remote.unidad_medida, remote.costo, remote.tipo, remote.codigo_subalmacen,
+                    remote.sub_almacen, remote.codigo_almacen, remote.almacen, remote.stock_act,
+                    codigo
+                  ] }
                 );
                 report.updatedLocal++;
                 logger.debug(`[MasterSyncService:articulos] ✏️ LOCAL actualizado desde MSSQL: ${codigo}`);
@@ -626,28 +619,27 @@ export class MasterSyncService {
         const local = localMap.get(nroOrden);
         if (!local) {
           try {
-            await FlotaOrdenServicioProfit.create({
-              nro_orden: remote.nro_orden,
-              Placa: remote.Placa,
-              km_horometro: remote.km_horometro,
-              recibido_por: remote.recibido_por,
-              entregado_por: remote.entregado_por ?? null,
-              fec_apertura: remote.fec_apertura ?? new Date(),
-              fec_cierre: remote.fec_cierre ?? null,
-              sintomas_reportados: remote.sintomas_reportados ?? '',
-              es_reincidencia: Boolean(remote.es_reincidencia),
-              nro_orden_anterior: remote.nro_orden_anterior ?? null,
-              motivo_reincidencia: remote.motivo_reincidencia ?? null,
-              fotos_adjuntas: remote.fotos_adjuntas ?? 0,
-              estatus: remote.estatus ?? 'ABIERTA',
-              costo_repuestos: remote.costo_repuestos ?? 0,
-              costo_mano_obra: remote.costo_mano_obra ?? 0,
-              costo_servicios_ext: remote.costo_servicios_ext ?? 0,
-              costo_total: remote.costo_total ?? 0,
-              recibe_conforme: remote.recibe_conforme ?? null,
-              hora_apertura: remote.hora_apertura ?? null,
-              hora_cierre: remote.hora_cierre ?? null,
-            });
+            // Insertar directamente en el espejo SQLite local
+            await profitMirrorSequelize.query(
+              `INSERT INTO flota_ordenes_servicio
+                (nro_orden, Placa, km_horometro, recibido_por, entregado_por,
+                 fec_apertura, fec_cierre, sintomas_reportados, es_reincidencia,
+                 nro_orden_anterior, motivo_reincidencia, fotos_adjuntas, estatus,
+                 costo_repuestos, costo_mano_obra, costo_servicios_ext, costo_total,
+                 recibe_conforme, hora_apertura, hora_cierre)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              { replacements: [
+                remote.nro_orden, remote.Placa, remote.km_horometro, remote.recibido_por,
+                remote.entregado_por ?? null, remote.fec_apertura ?? new Date(),
+                remote.fec_cierre ?? null, remote.sintomas_reportados ?? '',
+                remote.es_reincidencia ? 1 : 0, remote.nro_orden_anterior ?? null,
+                remote.motivo_reincidencia ?? null, remote.fotos_adjuntas ?? 0,
+                remote.estatus ?? 'ABIERTA', remote.costo_repuestos ?? 0,
+                remote.costo_mano_obra ?? 0, remote.costo_servicios_ext ?? 0,
+                remote.costo_total ?? 0, remote.recibe_conforme ?? null,
+                remote.hora_apertura ?? null, remote.hora_cierre ?? null
+              ] }
+            );
             report.insertedLocal++;
             logger.info(`[MasterSyncService:flota_ordenes_servicio] ➕ LOCAL ← MSSQL: ${nroOrden}`);
           } catch (e: any) {
@@ -660,29 +652,26 @@ export class MasterSyncService {
         const diffs = this.compareFlotaOrden(local, remote);
         if (diffs.length > 0) {
           try {
-            await FlotaOrdenServicioProfit.update(
-              {
-                Placa: remote.Placa,
-                km_horometro: remote.km_horometro,
-                recibido_por: remote.recibido_por,
-                entregado_por: remote.entregado_por ?? null,
-                fec_apertura: remote.fec_apertura ?? new Date(),
-                fec_cierre: remote.fec_cierre ?? null,
-                sintomas_reportados: remote.sintomas_reportados ?? '',
-                es_reincidencia: Boolean(remote.es_reincidencia),
-                nro_orden_anterior: remote.nro_orden_anterior ?? null,
-                motivo_reincidencia: remote.motivo_reincidencia ?? null,
-                fotos_adjuntas: remote.fotos_adjuntas ?? 0,
-                estatus: remote.estatus ?? 'ABIERTA',
-                costo_repuestos: remote.costo_repuestos ?? 0,
-                costo_mano_obra: remote.costo_mano_obra ?? 0,
-                costo_servicios_ext: remote.costo_servicios_ext ?? 0,
-                costo_total: remote.costo_total ?? 0,
-                recibe_conforme: remote.recibe_conforme ?? null,
-                hora_apertura: remote.hora_apertura ?? null,
-                hora_cierre: remote.hora_cierre ?? null,
-              },
-              { where: { nro_orden: nroOrden } }
+            await profitMirrorSequelize.query(
+              `UPDATE flota_ordenes_servicio SET
+                Placa = ?, km_horometro = ?, recibido_por = ?, entregado_por = ?,
+                fec_apertura = ?, fec_cierre = ?, sintomas_reportados = ?,
+                es_reincidencia = ?, nro_orden_anterior = ?, motivo_reincidencia = ?,
+                fotos_adjuntas = ?, estatus = ?, costo_repuestos = ?, costo_mano_obra = ?,
+                costo_servicios_ext = ?, costo_total = ?, recibe_conforme = ?,
+                hora_apertura = ?, hora_cierre = ?
+               WHERE nro_orden = ?`,
+              { replacements: [
+                remote.Placa, remote.km_horometro, remote.recibido_por,
+                remote.entregado_por ?? null, remote.fec_apertura ?? new Date(),
+                remote.fec_cierre ?? null, remote.sintomas_reportados ?? '',
+                remote.es_reincidencia ? 1 : 0, remote.nro_orden_anterior ?? null,
+                remote.motivo_reincidencia ?? null, remote.fotos_adjuntas ?? 0,
+                remote.estatus ?? 'ABIERTA', remote.costo_repuestos ?? 0,
+                remote.costo_mano_obra ?? 0, remote.costo_servicios_ext ?? 0,
+                remote.costo_total ?? 0, remote.recibe_conforme ?? null,
+                remote.hora_apertura ?? null, remote.hora_cierre ?? null, nroOrden
+              ] }
             );
             report.updatedLocal++;
             logger.debug(`[MasterSyncService:flota_ordenes_servicio] ✏️ LOCAL actualizado: ${nroOrden} (${diffs.join(', ')})`);
