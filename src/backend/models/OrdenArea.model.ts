@@ -14,6 +14,7 @@ export const TARIFAS_AREA: Record<string, number> = {
 export interface OrdenAreaAttributes {
   id: string; // e.g. OT-A1
   ordenId: string;
+  placa: string;
   area: string;
   fechaRecepcion: Date;
   mecanico: string;
@@ -31,6 +32,7 @@ export interface OrdenAreaCreationAttributes extends Optional<OrdenAreaAttribute
 export class OrdenArea extends Model<OrdenAreaAttributes, OrdenAreaCreationAttributes> implements OrdenAreaAttributes {
   public id!: string;
   public ordenId!: string;
+  public placa!: string;
   public area!: string;
   public fechaRecepcion!: Date;
   public mecanico!: string;
@@ -56,6 +58,11 @@ OrdenArea.init(
         model: 'ordenes_servicio',
         key: 'id',
       },
+    },
+    placa: {
+      type: DataTypes.STRING(30),
+      allowNull: false,
+      defaultValue: '',
     },
     area: {
       type: DataTypes.STRING(100),

@@ -39,6 +39,18 @@
         "/^node scripts/inspect-ordenes\\.cjs$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^node scripts/probe-user-perm-after\\.cjs$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const sqlite3=require\\(\"sqlite3\"\\); const db=new sqlite3\\.Database\\(\"data/sanluis\\.sqlite\"\\); db\\.all\\(\"PRAGMA table_info\\(ordenes_servicio_auditoria\\)\",\\(e,r\\)=>\\{if\\(e\\) throw e; console\\.log\\(r\\); db\\.close\\(\\);\\}\\);'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e \"const sqlite3=require\\('sqlite3'\\); const db=new sqlite3\\.Database\\('data/sanluis\\.sqlite'\\); db\\.all\\('PRAGMA table_info\\(ordenes_servicio_auditoria\\)',\\(e,r\\)=>\\{if\\(e\\) throw e; console\\.log\\(r\\); db\\.close\\(\\);\\}\\);\"$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     },
     "chat.byokUtilityModelDefault": "mainAgent",

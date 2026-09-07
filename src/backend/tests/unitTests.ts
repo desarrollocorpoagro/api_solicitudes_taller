@@ -501,7 +501,11 @@ export async function runAllUnitTests(): Promise<{ total: number; passed: number
 
   // SUITE: Historial de Auditoría y Trazabilidad Operativa
   await runTest('Auditoría & Trazabilidad', 'Debe registrar eventos de auditoría y calcular diferencias entre campos', async () => {
-    const testOrdenId = 'OS-2026-00101';
+    const testOrden = await OrdenServicio.findOne();
+    if (!testOrden) {
+      throw new Error('No existe una orden de servicio para probar la auditoría');
+    }
+    const testOrdenId = testOrden.id;
     const mockUser = {
       id: 99,
       fullName: 'Auditor Jefe Calidad',

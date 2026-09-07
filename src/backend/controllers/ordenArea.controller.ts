@@ -4,6 +4,22 @@ import { TARIFAS_AREA } from '../models/OrdenArea.model';
 import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 
+const canViewLaborCosts = (req: Request): boolean => {
+  if (req.user?.role?.toUpperCase() === 'ADMIN') return true;
+  return Boolean(req.user?.permissions?.some(
+    (permission) => permission.module === 'taller' && permission.actions.includes('view_costs')
+  ));
+};
+
+const serializeArea = (area: OrdenArea, includeCosts: boolean): Record<string, any> => {
+  const data = area.toJSON();
+  if (!includeCosts) {
+    const { tarifaHora: _tarifaHora, costoManoObra: _costoManoObra, ...withoutCosts } = data;
+    return withoutCosts;
+  }
+  return data;
+};
+
 export class OrdenAreaController {
   /**
    * Crea una nueva orden de área (OT) dentro de una orden de servicio.
@@ -33,6 +49,7 @@ export class OrdenAreaController {
       const nuevaArea = await OrdenArea.create({
         id: otId,
         ordenId,
+        placa: String(orden.placa).trim().toUpperCase(),
         area,
         fechaRecepcion: fechaRecepcion ? new Date(fechaRecepcion) : new Date(),
         mecanico,
@@ -64,7 +81,7 @@ export class OrdenAreaController {
       return res.status(201).json({
         success: true,
         message: 'Orden de área creada exitosamente.',
-        data: nuevaArea,
+        data: serializeArea(nuevaArea, canViewLaborCosts(req)),
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, error: error.message });
@@ -196,7 +213,7 @@ export class OrdenAreaController {
       return res.json({
         success: true,
         message: 'Orden de área actualizada.',
-        data: area,
+        data: serializeArea(area, canViewLaborCosts(req)),
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, error: error.message });

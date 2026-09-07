@@ -4,6 +4,7 @@ import { sequelize } from '../config/database';
 export interface SolicitudRepuestoAttributes {
   id: string;
   ordenId: string;
+  placa: string;
   otId: string;
   cod: string;
   desc: string;
@@ -31,6 +32,7 @@ export interface SolicitudRepuestoCreationAttributes extends Optional<SolicitudR
 export class SolicitudRepuesto extends Model<SolicitudRepuestoAttributes, SolicitudRepuestoCreationAttributes> implements SolicitudRepuestoAttributes {
   public id!: string;
   public ordenId!: string;
+  public placa!: string;
   public otId!: string;
   public cod!: string;
   public desc!: string;
@@ -67,6 +69,11 @@ SolicitudRepuesto.init(
         model: 'ordenes_servicio',
         key: 'id',
       },
+    },
+    placa: {
+      type: DataTypes.STRING(30),
+      allowNull: false,
+      defaultValue: '',
     },
     otId: {
       type: DataTypes.STRING(50),

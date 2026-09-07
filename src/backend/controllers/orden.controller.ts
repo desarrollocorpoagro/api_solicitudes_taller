@@ -15,7 +15,44 @@ import { SyncService } from '../services/sync.service';
 import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 import { getTenantContext, getAuthorizedPlatesForTenant } from '../utils/tenantHelper';
-import { findUnidadByPlaca } from '../utils/flotaLookup';
+import { findUnidadByPlaca, resolveVendedorCedula } from '../utils/flotaLookup';
+import { profitMirrorSequelize } from '../config/profitDb';
+
+const canViewLaborCosts = (req: Request): boolean => {
+  if (req.user?.role?.toUpperCase() === 'ADMIN') return true;
+  return Boolean(req.user?.permissions?.some(
+    (permission) => permission.module === 'taller' && permission.actions.includes('view_costs')
+  ));
+};
+
+const serializeOrder = (order: OrdenServicio, includeCosts: boolean): Record<string, any> => {
+  const data = order.toJSON() as Record<string, any>;
+  if (!includeCosts && Array.isArray(data.ordenesArea)) {
+    data.ordenesArea = data.ordenesArea.map((area: Record<string, any>) => {
+      const sanitized = { ...area };
+      delete sanitized.tarifaHora;
+      delete sanitized.costoManoObra;
+      return sanitized;
+    });
+  }
+  if (!includeCosts) {
+    if (Array.isArray(data.solicitudesRepuesto)) {
+      data.solicitudesRepuesto = data.solicitudesRepuesto.map((item: Record<string, any>) => {
+        const { costoUnitario: _costoUnitario, costoTotal: _costoTotal, ...withoutCosts } = item;
+        return withoutCosts;
+      });
+    }
+    if (Array.isArray(data.solicitudesExterno)) {
+      data.solicitudesExterno = data.solicitudesExterno.map((item: Record<string, any>) => {
+        const { costoCotizado: _costoCotizado, costoEfectivo: _costoEfectivo, ...withoutCosts } = item;
+        return withoutCosts;
+      });
+    }
+    const { totalRepuestos: _totalRepuestos, totalManoObra: _totalManoObra, totalExternos: _totalExternos, totalGeneral: _totalGeneral, ...withoutTotals } = data;
+    return withoutTotals;
+  }
+  return data;
+};
 
 export class OrdenController {
   /**
@@ -171,10 +208,19 @@ export class OrdenController {
         }
       }
 
-      // Actualizar kilometraje en maestro de flota si es mayor
-      if (km > unidad.km) {
-        unidad.km = km;
-        await unidad.save();
+      // Actualizar kilometraje en maestro de flota si es mayor.
+      // La tabla flota_vehiculos es un espejo SQLite (no Sequelize), por lo que
+      // hacemos UPDATE directo en lugar de .save() sobre el objeto plano.
+      if (unidad && Number(unidad.km ?? 0) > 0 && km > Number(unidad.km)) {
+        try {
+          await profitMirrorSequelize.query(
+            `UPDATE flota_vehiculos SET km_actual = ? WHERE LTRIM(RTRIM(Placa)) = LTRIM(RTRIM(?))`,
+            { replacements: [km, String(unidad.placa ?? '').trim().toUpperCase()] }
+          );
+          unidad.km = km;
+        } catch (kmErr: any) {
+          logger.warn(`[OrdenController] No se pudo actualizar km en flota espejo: ${kmErr.message}`);
+        }
       }
 
       const id = await OrdenController.generateOrdenId();
@@ -200,6 +246,8 @@ export class OrdenController {
         totalGeneral: 0,
       });
 
+      const entregadoPorCedula = await resolveVendedorCedula(nuevaOrden.entregadoPor);
+
       // Guardar y sincronizar simultáneamente en MSSQL Profit Plus (ad_trans.dbo.flota_ordenes_servicio)
       let syncedToMssql = false;
       try {
@@ -208,7 +256,7 @@ export class OrdenController {
           Placa: String(nuevaOrden.placa).trim().toUpperCase(),
           km_horometro: parseFloat(String(nuevaOrden.km)) || 0,
           recibido_por: String(nuevaOrden.recibidoPor).trim(),
-          entregado_por: nuevaOrden.entregadoPor ? String(nuevaOrden.entregadoPor).trim() : null,
+          entregado_por: entregadoPorCedula,
           fec_apertura: nuevaOrden.fechaApertura || new Date(),
           fec_cierre: null,
           sintomas_reportados: String(nuevaOrden.sintomas).trim(),
@@ -306,7 +354,7 @@ export class OrdenController {
       return res.json({
         success: true,
         count: ordenes.length,
-        data: ordenes,
+        data: ordenes.map((orden) => serializeOrder(orden, canViewLaborCosts(req))),
         activeCompany: tenant ? tenant.companyName : undefined,
       });
     } catch (error: any) {
@@ -357,7 +405,7 @@ export class OrdenController {
 
       return res.json({
         success: true,
-        data: orden,
+        data: serializeOrder(orden, canViewLaborCosts(req)),
         unidad,
         liquidacion: {
           ...totales,
@@ -469,12 +517,31 @@ export class OrdenController {
         });
       }
 
-      // Si la unidad tuvo reparación mayor, actualizar historial para futuras reincidencias
-      if (unidad) {
-        unidad.historialOsAnterior = orden.id;
-        unidad.historialDias = 0;
-        unidad.historialArea = (orden.ordenesArea && orden.ordenesArea[0]?.area) || 'Taller General';
-        await unidad.save();
+      // Si la unidad tuvo reparación mayor, actualizar historial para futuras reincidencias.
+      // flota_vehiculos es espejo SQLite (no Sequelize): UPDATE directo.
+      if (unidad && unidad.placa) {
+        try {
+          const histArea = (orden.ordenesArea && orden.ordenesArea[0]?.area) || 'Taller General';
+          await profitMirrorSequelize.query(
+            `UPDATE flota_vehiculos
+                SET historialOsAnterior = ?, historialDias = 0, historialArea = ?
+              WHERE LTRIM(RTRIM(Placa)) = LTRIM(RTRIM(?))`,
+            {
+              replacements: [
+                orden.id,
+                histArea,
+                String(unidad.placa).trim().toUpperCase(),
+              ],
+            }
+          );
+          unidad.historialOsAnterior = orden.id;
+          unidad.historialDias = 0;
+          unidad.historialArea = histArea;
+        } catch (histErr: any) {
+          logger.warn(
+            `[OrdenController] No se pudo actualizar historial en flota espejo: ${histErr.message}`
+          );
+        }
       }
 
       // Registrar auditoría de cierre formal

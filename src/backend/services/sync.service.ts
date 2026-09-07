@@ -13,6 +13,7 @@ import {
 } from '../models';
 import { profitSequelize, getProfitConnectionStatus } from '../config/profitDb';
 import { logger } from '../utils/logger';
+import { resolveVendedorCedula } from '../utils/flotaLookup';
 
 export interface SyncStatusReport {
   isOnline: boolean;
@@ -296,7 +297,10 @@ export class SyncService {
     const placa = (localOrden?.placa || payloadData.placa || 'SIN-PLACA').trim().toUpperCase();
     const km = parseFloat(String(localOrden?.km ?? payloadData.km ?? 0)) || 0;
     const recibidoPor = String(localOrden?.recibidoPor || payloadData.recibidoPor || 'MEC-001').trim();
-    const entregadoPor = localOrden?.entregadoPor || payloadData.entregadoPor ? String(localOrden?.entregadoPor || payloadData.entregadoPor).trim() : null;
+    const entregadoPorNombre = localOrden?.entregadoPor || payloadData.entregadoPor
+      ? String(localOrden?.entregadoPor || payloadData.entregadoPor).trim()
+      : null;
+    const entregadoPor = await resolveVendedorCedula(entregadoPorNombre);
     const sintomas = String(localOrden?.sintomas || payloadData.sintomas || '').trim();
     const esReincidencia = Boolean(localOrden?.esReincidencia ?? payloadData.esReincidencia);
     const osAnterior = localOrden?.osAnterior || payloadData.osAnterior ? String(localOrden?.osAnterior || payloadData.osAnterior).trim() : null;

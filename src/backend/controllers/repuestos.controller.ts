@@ -31,6 +31,7 @@ export class RepuestosController {
 
       const solicitud = await SolicitudRepuesto.create({
         ordenId,
+        placa: String(orden.placa).trim().toUpperCase(),
         otId,
         cod: articulo.cod,
         desc: articulo.desc,

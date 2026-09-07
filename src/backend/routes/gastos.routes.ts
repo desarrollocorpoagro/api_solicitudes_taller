@@ -9,6 +9,9 @@ router.get('/stats', authenticateToken('FULL_AUTH'), GastosController.stats);
 router.get('/', authenticateToken('FULL_AUTH'), GastosController.list);
 router.post('/backfill', authenticateToken('FULL_AUTH'), GastosController.backfill);
 router.post('/sync', authenticateToken('FULL_AUTH'), GastosController.syncToMssql);
+router.post('/sync/:id', authenticateToken('FULL_AUTH'), GastosController.syncOne);
 router.post('/regenerate/:solicitudId', authenticateToken('FULL_AUTH'), GastosController.regenerateForSolicitud);
+router.post('/regenerate-ref/:id', authenticateToken('FULL_AUTH'), GastosController.regenerate);
+router.post('/', authenticateToken('FULL_AUTH'), GastosController.create);
 
 export default router;

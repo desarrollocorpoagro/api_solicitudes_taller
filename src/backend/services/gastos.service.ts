@@ -1,21 +1,76 @@
+/**
+ * gastos.service.ts
+ *
+ * Servicio de gastos locales con sincronización a MSSQL Profit Plus.
+ *
+ * Tres orígenes de captura:
+ *   1. AREA       → ensureLocalGastoForArea(ordenArea)        — mano de obra
+ *   2. REPUESTO   → ensureLocalGastoForRepuesto(solicitud)  — repuestos aprobados/despachados
+ *   3. EXTERNO    → ensureLocalGastoForExterno(solicitud)   — servicios externos aprobados
+ *
+ * Cada origen setea `tipo_origen` e `id_origen_referencia`. La `idempotency_key`
+ * se deriva automáticamente como `${tipo_origen}:${id_origen_referencia}`,
+ * lo que permite UPSERT idempotente en MSSQL sin duplicar filas en reconexiones.
+ *
+ * Estados de sincronización (campo `estado_sincronizacion`):
+ *   - PENDIENTE: aún no enviado a MSSQL
+ *   - ENVIADO:   confirmado en MSSQL (con `mssqlSyncedAt`)
+ *   - ERROR:     último intento falló (mensaje en `mssqlError`, contador en
+ *                `intentos_sincronizacion`); reintento automático en el próximo ciclo.
+ *
+ * Reglas de validación:
+ *   - Si la orden padre está `Cerrada`, no se generan gastos nuevos (mantiene auditoría).
+ *   - El monto se calcula en `beforeSave` pero también se acepta fijado manualmente.
+ *   - La placa del vehículo se extrae siempre de la orden padre.
+ *
+ * Flujo de sincronización (syncGastosToMssql):
+ *   1. Espera a que MSSQL responda (ping + backoff 20s).
+ *   2. Asegura que la tabla `dbo.gastos` exista.
+ *   3. Descubre columnas reales (introspección) → UPSERT sólo con intersección.
+ *   4. Lee filas con `estado_sincronizacion='PENDIENTE'` (o `ERROR` con reintentos).
+ *   5. Por cada fila: MERGE/ON CONFLICT en MSSQL con `idempotency_key` como clave
+ *      de deduplicación. Si la operación es exitosa, marca `ENVIADO` +
+ *      `mssqlSyncedAt`; si falla, marca `ERROR` + `intentos_sincronizacion++`.
+ *   6. Reintentos automáticos con backoff exponencial para errores transitorios.
+ */
+
 import { Op } from 'sequelize';
-import { sequelize, SolicitudRepuesto, OrdenServicio } from '../models';
-import { profitMirrorSequelize, profitSequelize, isMssqlConnectionActive } from '../config/profitDb';
-import { Gasto } from '../models/Gasto.model';
+import {
+  sequelize,
+  SolicitudRepuesto,
+  SolicitudExterno,
+  OrdenServicio,
+  OrdenArea,
+} from '../models';
+import {
+  profitMirrorSequelize,
+  profitSequelize,
+  isMssqlConnectionActive,
+} from '../config/profitDb';
+import { Gasto, GastoOrigen } from '../models/Gasto.model';
 import { logger } from '../utils/logger';
 
-export interface GastoDraft {
-  ordenId: string;
-  solicitudId: string;
-  codigo_articulo: string;
-  co_prov?: string;
-  cantidad: number;
-  horas_trabajadas?: number;
-  fecha_actividad?: Date;
-  usuario?: string;
-  nota?: string;
-  co_cli?: string;
+// ─────────────────────────────────────────────────────────────────────────────
+// Tipos públicos
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SyncReport {
+  attempted: number;
+  inserted: number;
+  updated: number;
+  failed: number;
+  errors: string[];
+  durationMs: number;
 }
+
+export interface ValidationResult {
+  ok: boolean;
+  errors: string[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catálogo espejo (vw_flota_articulos)
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface ArticuloEspejo {
   codigo_profit?: string | null;
@@ -24,10 +79,6 @@ interface ArticuloEspejo {
   codigo_subalmacen?: string | null;
 }
 
-/**
- * Busca los datos espejo del artículo (`vw_flota_articulos`) por `codigo_profit`.
- * Devuelve null si la fila no existe para que el caller decida cómo continuar.
- */
 export async function findArticuloEspejo(codigoArticulo: string): Promise<ArticuloEspejo | null> {
   const [rows]: any = await profitMirrorSequelize.query(
     `SELECT codigo_profit, unidad_medida, costo, codigo_subalmacen
@@ -39,33 +90,222 @@ export async function findArticuloEspejo(codigoArticulo: string): Promise<Articu
   return rows?.[0] ?? null;
 }
 
-function calcTotal(cantidad: number, costo: number, horas: number): number {
-  if (horas > 0) {
-    return Number((horas * costo).toFixed(4));
+export async function resolveFlotaOrdenId(ordenId: string): Promise<number | null> {
+  const [rows]: any = await profitMirrorSequelize.query(
+    `SELECT id_orden FROM flota_ordenes_servicio
+     WHERE UPPER(TRIM(nro_orden)) = UPPER(TRIM(?))
+     LIMIT 1`,
+    { replacements: [ordenId] }
+  );
+  const mirrorId = Number(rows?.[0]?.id_orden);
+  if (Number.isInteger(mirrorId) && mirrorId > 0) return mirrorId;
+
+  try {
+    const table = profitSequelize.getDialect() === 'mssql'
+      ? '[AD_TRANS].[dbo].[flota_ordenes_servicio]'
+      : 'flota_ordenes_servicio';
+    const [remoteRows]: any = await profitSequelize.query(
+      `SELECT id_orden FROM ${table}
+       WHERE UPPER(LTRIM(RTRIM(nro_orden))) = UPPER(LTRIM(RTRIM(?)))`,
+      { replacements: [ordenId] }
+    );
+    const remoteId = Number(remoteRows?.[0]?.id_orden);
+    return Number.isInteger(remoteId) && remoteId > 0 ? remoteId : null;
+  } catch {
+    return null;
   }
-  return Number((cantidad * costo).toFixed(4));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Reglas de validación
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Garantiza que exista un `Gasto` local asociado a la solicitud de repuesto,
- * siempre que la orden padre NO esté en estado `Cerrada`. Si ya existe (por
- * una re-sincronización o reintento), se actualiza con los nuevos valores.
+ * Valida un payload de gasto antes de persistirlo localmente.
+ * Devuelve { ok: true } si pasa todas las reglas, o { ok: false, errors }
+ * con la lista de mensajes legibles para el usuario.
  */
-export async function ensureLocalGastoForSolicitud(
+export function validateGastoDraft(draft: {
+  ordenId?: string | null;
+  id_origen_referencia?: string | null;
+  tipo_origen?: GastoOrigen | null;
+  monto?: number | null;
+  fecha_actividad?: Date | null;
+}): ValidationResult {
+  const errors: string[] = [];
+  if (!draft.ordenId || draft.ordenId.trim() === '') {
+    errors.push('El campo ordenId es obligatorio.');
+  }
+  if (!draft.id_origen_referencia || draft.id_origen_referencia.trim() === '') {
+    errors.push('El campo id_origen_referencia es obligatorio.');
+  }
+  if (!draft.tipo_origen || !['AREA', 'REPUESTO', 'EXTERNO'].includes(draft.tipo_origen)) {
+    errors.push('El campo tipo_origen debe ser AREA, REPUESTO o EXTERNO.');
+  }
+  if (draft.monto !== undefined && draft.monto !== null && Number(draft.monto) < 0) {
+    errors.push('El monto no puede ser negativo.');
+  }
+  if (draft.fecha_actividad && isNaN(new Date(draft.fecha_actividad).getTime())) {
+    errors.push('La fecha_actividad no es válida.');
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Captura: helper de bajo nivel
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Inserta o actualiza un gasto local para la clave (tipo_origen, id_origen_referencia).
+ * Usa `idempotency_key` para deduplicación dentro de la misma BD local.
+ *
+ * Si la orden padre está `Cerrada`, devuelve `null` sin modificar nada
+ * (mantiene la auditoría histórica).
+ */
+async function upsertGastoLocal(params: {
+  tipo_origen: GastoOrigen;
+  id_origen_referencia: string;
+  ordenId: string;
+  codigo_articulo?: string | null;
+  codigo_subalmacen?: string | null;
+  co_prov?: string | null;
+  co_cli?: string | null;
+  cantidad?: number;
+  unidad?: string | null;
+  horas_trabajadas?: number;
+  costo_unitario?: number;
+  monto: number;
+  fecha_actividad?: Date;
+  placa?: string;
+  usuario?: string;
+  nota?: string;
+}): Promise<Gasto | null> {
+  // Regla de negocio: no generar gastos sobre órdenes cerradas.
+  const orden = await OrdenServicio.findByPk(params.ordenId);
+  if (!orden) {
+    logger.warn(`[GastosService] Orden ${params.ordenId} no encontrada; gasto omitido.`);
+    return null;
+  }
+  if (orden.estado === 'Cerrada') {
+    logger.debug(`[GastosService] Orden ${params.ordenId} cerrada; gasto omitido.`);
+    return null;
+  }
+
+  // Resolver placa desde la orden (siempre que esté presente).
+  const placa = (params.placa ?? orden.placa ?? '').toString().trim().toUpperCase();
+  if (!placa) {
+    logger.warn(`[GastosService] Orden ${params.ordenId} sin placa; gasto omitido.`);
+    return null;
+  }
+
+  // Buscar existente por idempotency_key (= tipo_origen:id_origen_referencia)
+  const idempotencyKey = `${params.tipo_origen}:${params.id_origen_referencia}`;
+  const idOrdenser = await resolveFlotaOrdenId(params.ordenId);
+  const existente = await Gasto.findOne({ where: { idempotency_key: idempotencyKey } });
+
+  if (existente) {
+    existente.codigo_articulo = params.codigo_articulo ?? existente.codigo_articulo;
+    existente.codigo_subalmacen = params.codigo_subalmacen?.trim() || existente.codigo_subalmacen?.trim() || '01';
+    existente.co_prov = params.co_prov ?? existente.co_prov;
+    existente.co_cli = params.co_cli ?? existente.co_cli;
+    existente.cantidad = params.cantidad ?? existente.cantidad;
+    existente.unidad = params.unidad ?? existente.unidad;
+    existente.horas_trabajadas = params.horas_trabajadas ?? existente.horas_trabajadas;
+    existente.costo_unitario = params.costo_unitario ?? existente.costo_unitario;
+    existente.costo_total_calculado = params.monto;
+    existente.monto = params.monto;
+    existente.id_ordenser = idOrdenser;
+    existente.fecha_actividad = params.fecha_actividad ?? new Date();
+    existente.placa = placa || existente.placa || '';
+    existente.usuario = params.usuario ?? existente.usuario;
+    existente.nota = params.nota ?? existente.nota;
+    // Si el monto cambió, hay que reintentar sync.
+    existente.estado_sincronizacion = 'PENDIENTE';
+    existente.syncedToMssql = false;
+    existente.mssqlError = null;
+    await existente.save();
+    return existente;
+  }
+
+  return await Gasto.create({
+    tipo_origen: params.tipo_origen,
+    id_origen_referencia: params.id_origen_referencia,
+    idempotency_key: idempotencyKey,
+    ordenId: params.ordenId,
+    codigo_articulo: params.codigo_articulo ?? null,
+    codigo_subalmacen: params.codigo_subalmacen?.trim() || '01',
+    co_prov: params.co_prov ?? 'GEN',
+    co_cli: params.co_cli ?? null,
+    cantidad: params.cantidad ?? 0,
+    unidad: params.unidad ?? null,
+    horas_trabajadas: params.horas_trabajadas ?? 0,
+    costo_unitario: params.costo_unitario ?? 0,
+    costo_total_calculado: params.monto,
+    monto: params.monto,
+    fecha_actividad: params.fecha_actividad ?? new Date(),
+    placa,
+    usuario: params.usuario ?? '',
+    nota: params.nota ?? '',
+    fecha_create: new Date(),
+    id_ordenser: idOrdenser,
+    estado_sincronizacion: 'PENDIENTE',
+    syncedToMssql: false,
+    intentos_sincronizacion: 0,
+  } as any);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Captura desde OrdenArea (mano de obra)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Garantiza que exista un Gasto local para una OrdenArea (mano de obra).
+ * El monto se calcula como `horas * tarifaHora`. Si la OrdenArea cambia
+ * (horas/tarifa), se actualiza el gasto existente y se re-marcarará PENDIENTE.
+ */
+export async function ensureLocalGastoForArea(ordenArea: OrdenArea): Promise<Gasto | null> {
+  const horas = Number(ordenArea.horas ?? 0);
+  const tarifa = Number(ordenArea.tarifaHora ?? 0);
+  const monto = Number((horas * tarifa).toFixed(4));
+
+  if (horas <= 0 || monto <= 0) {
+    logger.debug(`[GastosService] OrdenArea ${ordenArea.id} sin horas/tarifa válidas; gasto omitido.`);
+    return null;
+  }
+
+  return upsertGastoLocal({
+    tipo_origen: 'AREA',
+    id_origen_referencia: ordenArea.id,
+    ordenId: ordenArea.ordenId,
+    cantidad: 1,
+    horas_trabajadas: horas,
+    costo_unitario: tarifa,
+    monto,
+    nota: `Mano de obra área "${ordenArea.area}" — ${ordenArea.mecanico || 's/m'}`,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. Captura desde SolicitudRepuesto
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Garantiza que exista un Gasto local para una SolicitudRepuesto.
+ * Se invoca:
+ *   - Al crearse la solicitud (afterCreate hook).
+ *   - Al aprobarse (estadoAprobacion → Aprobada): si cambia el costo, se actualiza.
+ *   - Al despacharse (estadoEntrega → Entregado): se re-marcarará PENDIENTE si hubo cambios.
+ */
+export async function ensureLocalGastoForRepuesto(
   solicitud: SolicitudRepuesto,
   opts: { usuario?: string; nota?: string } = {}
 ): Promise<Gasto | null> {
+  if (!solicitud.ordenId) return null;
   const orden = await OrdenServicio.findByPk(solicitud.ordenId);
-  if (!orden) {
-    logger.warn(`[GastosService] Orden ${solicitud.ordenId} no encontrada, gasto omitido.`);
-    return null;
-  }
+  if (!orden) return null;
+  if (orden.estado === 'Cerrada') return null;
 
-  if (orden.estado === 'Cerrada') {
-    logger.debug(`[GastosService] Orden ${orden.id} cerrada, no se genera gasto.`);
-    return null;
-  }
-
+  // Resolver datos espejo del artículo (codigo_subalmacen, unidad_medida, costo)
   const articulo = await findArticuloEspejo(solicitud.cod);
   if (!articulo) {
     logger.warn(
@@ -75,98 +315,437 @@ export async function ensureLocalGastoForSolicitud(
   }
 
   const cantidad = Number(solicitud.cant ?? 0);
-  const horas = 0; // Por defecto, se sobreescribe en una fase posterior
   const costoUnitario = Number(articulo.costo ?? solicitud.costoUnitario ?? 0);
-  const total = calcTotal(cantidad, costoUnitario, horas);
+  const monto = Number((cantidad * costoUnitario).toFixed(4));
 
-  // Resolver la placa vehicular desde la orden padre (validada contra flota_vehiculos).
-  // Queda en blanco por defecto si la orden no tiene placa asignada.
-  const placa = (orden.placa ?? '').toString().trim();
-
-  const [gasto, created] = await Gasto.findOrCreate({
-    where: { solicitudId: solicitud.id },
-    defaults: {
-      ordenId: solicitud.ordenId,
-      solicitudId: solicitud.id,
-      codigo_articulo: solicitud.cod,
-      codigo_subalmacen: articulo.codigo_subalmacen ?? null,
-      co_cli: opts.nota ?? null,
-      co_prov: 'GEN',
-      fecha_actividad: new Date(),
-      cantidad,
-      unidad: articulo.unidad_medida ?? null,
-      horas_trabajadas: horas,
-      costo_unitario: costoUnitario,
-      costo_total_calculado: total,
-      usuario: opts.usuario ?? '',
-      nota: opts.nota ?? '',
-      fecha_create: new Date(),
-      placa,
-      syncedToMssql: false,
-    },
+  return upsertGastoLocal({
+    tipo_origen: 'REPUESTO',
+    id_origen_referencia: solicitud.id,
+    ordenId: solicitud.ordenId,
+    codigo_articulo: solicitud.cod,
+    codigo_subalmacen: articulo.codigo_subalmacen?.trim() || '01',
+    co_cli: opts.nota ?? null,
+    co_prov: 'GEN',
+    cantidad,
+    unidad: articulo.unidad_medida ?? null,
+    horas_trabajadas: 0,
+    costo_unitario: costoUnitario,
+    monto,
+    usuario: opts.usuario,
+    nota: opts.nota ?? `Repuesto ${solicitud.cod} (${solicitud.desc || ''})`,
   });
-
-  if (!created) {
-    gasto.codigo_articulo = solicitud.cod;
-    gasto.codigo_subalmacen = articulo.codigo_subalmacen ?? gasto.codigo_subalmacen;
-    gasto.cantidad = cantidad;
-    gasto.unidad = articulo.unidad_medida ?? gasto.unidad;
-    gasto.horas_trabajadas = horas;
-    gasto.costo_unitario = costoUnitario;
-    gasto.costo_total_calculado = total;
-    gasto.fecha_actividad = new Date();
-    gasto.placa = placa || gasto.placa || '';
-    gasto.syncedToMssql = false;
-    gasto.mssqlError = null;
-    await gasto.save();
-  }
-
-  return gasto;
 }
 
-export interface SyncReport {
-  attempted: number;
-  inserted: number;
-  failed: number;
-  errors: string[];
-  durationMs: number;
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. Captura desde SolicitudExterno
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Garantiza que exista un Gasto local para una SolicitudExterno.
+ * Se invoca al aprobarse (estadoAprobacion → Aprobada).
+ * Para servicios con garantía el monto es 0 (no se imputa al cliente).
+ */
+export async function ensureLocalGastoForExterno(
+  solicitud: SolicitudExterno,
+  opts: { usuario?: string } = {}
+): Promise<Gasto | null> {
+  if (!solicitud.ordenId) return null;
+  const orden = await OrdenServicio.findByPk(solicitud.ordenId);
+  if (!orden) return null;
+  if (orden.estado === 'Cerrada') return null;
+
+  const monto = Number(solicitud.costoEfectivo ?? 0);
+  if (monto < 0) {
+    logger.warn(`[GastosService] SolicitudExterno ${solicitud.id} con costoEfectivo negativo.`);
+    return null;
+  }
+
+  return upsertGastoLocal({
+    tipo_origen: 'EXTERNO',
+    id_origen_referencia: solicitud.id,
+    ordenId: solicitud.ordenId,
+    co_prov: solicitud.proveedor || 'GEN',
+    cantidad: 1,
+    horas_trabajadas: 0,
+    costo_unitario: monto,
+    monto,
+    usuario: opts.usuario,
+    nota: `Servicio externo: ${solicitud.descripcion || ''}${solicitud.conGarantia ? ' [GARANTÍA]' : ''}`,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Backfill: regenerar todos los gastos de órdenes abiertas
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Recorre todas las solicitudes y áreas de órdenes aún no cerradas, y
+ * garantiza que tengan su Gasto local. Útil al migrar o tras restaurar
+ * copias de seguridad. NO elimina gastos históricos.
+ */
+export async function backfillGastosForOpenOrders(): Promise<{
+  processed: number;
+  created: number;
+  updated: number;
+  skipped: number;
+}> {
+  let processed = 0;
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  // Repuestos aprobados
+  const solicitudes = await SolicitudRepuesto.findAll({
+    include: [{ model: OrdenServicio, as: 'orden' }],
+  });
+  for (const s of solicitudes as any[]) {
+    if (!s.orden || s.orden.estado === 'Cerrada') {
+      skipped++;
+      continue;
+    }
+    processed++;
+    const before = await Gasto.findOne({ where: { idempotency_key: `REPUESTO:${s.id}` } });
+    const gasto = await ensureLocalGastoForRepuesto(s);
+    if (!gasto) {
+      skipped++;
+      continue;
+    }
+    if (before && before.id === gasto.id) updated++;
+    else created++;
+  }
+
+  // Servicios externos aprobados
+  const externos = await SolicitudExterno.findAll({
+    include: [{ model: OrdenServicio, as: 'orden' }],
+  });
+  for (const s of externos as any[]) {
+    if (!s.orden || s.orden.estado === 'Cerrada') {
+      skipped++;
+      continue;
+    }
+    processed++;
+    const before = await Gasto.findOne({ where: { idempotency_key: `EXTERNO:${s.id}` } });
+    const gasto = await ensureLocalGastoForExterno(s);
+    if (!gasto) {
+      skipped++;
+      continue;
+    }
+    if (before && before.id === gasto.id) updated++;
+    else created++;
+  }
+
+  // Áreas con horas registradas
+  const areas = await OrdenArea.findAll({
+    include: [{ model: OrdenServicio, as: 'orden' }],
+  });
+  for (const a of areas as any[]) {
+    if (!a.orden || a.orden.estado === 'Cerrada') {
+      skipped++;
+      continue;
+    }
+    processed++;
+    const before = await Gasto.findOne({ where: { idempotency_key: `AREA:${a.id}` } });
+    const gasto = await ensureLocalGastoForArea(a);
+    if (!gasto) {
+      skipped++;
+      continue;
+    }
+    if (before && before.id === gasto.id) updated++;
+    else created++;
+  }
+
+  logger.info(
+    `[GastosService] Backfill: processed=${processed} created=${created} updated=${updated} skipped=${skipped}`
+  );
+  return { processed, created, updated, skipped };
+}
+
+export async function backfillGastoOrderIds(): Promise<number> {
+  let updated = 0;
+  const gastos = await Gasto.findAll({ where: { id_ordenser: null } });
+  for (const gasto of gastos) {
+    if (!gasto.ordenId) continue;
+    const idOrdenser = await resolveFlotaOrdenId(gasto.ordenId);
+    if (idOrdenser === null) continue;
+    gasto.id_ordenser = idOrdenser;
+    await gasto.save();
+    updated++;
+  }
+  return updated;
 }
 
 /**
- * Empuja a MSSQL Profit AD_TRANS los gastos locales pendientes.
- * Si MSSQL no está disponible, registra el error por fila para reintento.
- *
- * Estrategia:
- *  1. Espera activamente a que MSSQL responda (ping + retry exponencial acotado).
- *  2. Asegura que la tabla `dbo.gastos` exista (DDL idempotente).
- *  3. Descubre las columnas reales de `dbo.gastos` vía INFORMATION_SCHEMA.COLUMNS
- *     para no fallar si el esquema real tiene una forma distinta.
- *  4. Hace un upsert idempotente sobre la clave natural
- *     (codigo_articulo) usando `MERGE` cuando es MSSQL
- *     y `INSERT ... ON CONFLICT` cuando es SQLite (modo fallback).
+ * Compatibilidad hacia atrás: el afterCreate hook de SolicitudRepuesto
+ * (definido en models/index.ts) llama a esta función.
  */
-export async function syncGastosToMssql(opts: { limit?: number } = {}): Promise<SyncReport> {
+export const ensureLocalGastoForSolicitud = ensureLocalGastoForRepuesto;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sincronización a MSSQL
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Espera a que MSSQL responda. Backoff lineal corto. Devuelve true al primer
+ * ping exitoso o false si se agotó el timeout.
+ */
+async function waitForMssqlReady(totalTimeoutMs: number, initialDelayMs: number): Promise<boolean> {
+  const deadline = Date.now() + totalTimeoutMs;
+  let delay = initialDelayMs;
+  const maxDelay = 4_000;
+  while (Date.now() < deadline) {
+    try {
+      await profitSequelize.query('SELECT 1 AS ok');
+      return true;
+    } catch {
+      await new Promise((r) => setTimeout(r, delay));
+      delay = Math.min(delay + 500, maxDelay);
+    }
+  }
+  return false;
+}
+
+/** Serializa un Date a formato MSSQL `datetime` (evita el bug ISO-8601 'T'/'Z'). */
+function toMssqlDateTime(v: any): string | null {
+  if (v === null || v === undefined) return null;
+  let d: Date | null = null;
+  if (v instanceof Date) d = v;
+  else if (typeof v === 'string') {
+    const trimmed = v.trim();
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,7})?$/.test(trimmed)) return trimmed;
+    const parsed = new Date(trimmed);
+    d = isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (!d || isNaN(d.getTime())) return null;
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
+    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.${pad(d.getUTCMilliseconds(), 3)}`;
+}
+
+let mssqlTableEnsured = false;
+async function ensureMssqlGastosTable(): Promise<void> {
+  if (mssqlTableEnsured) return;
+  const [exists]: any = await profitSequelize.query(
+    `SELECT TOP 1 1 AS ok FROM [INFORMATION_SCHEMA].[TABLES] WHERE TABLE_NAME = 'gastos'`
+  );
+  if (exists && exists.length > 0) {
+    const [columns]: any = await profitSequelize.query(
+      `SELECT LOWER(COLUMN_NAME) AS name, LOWER(DATA_TYPE) AS data_type
+       FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE TABLE_NAME = 'gastos'`
+    );
+    const idOrdenserColumn = (columns ?? []).find((column: any) => column.name === 'id_ordenser');
+    if (!idOrdenserColumn) {
+      await profitSequelize.query(`ALTER TABLE [dbo].[gastos] ADD [id_ordenser] BIGINT NULL`);
+    } else if (idOrdenserColumn.data_type !== 'bigint') {
+      await profitSequelize.query(`ALTER TABLE [dbo].[gastos] ALTER COLUMN [id_ordenser] BIGINT NULL`);
+    }
+    const hasIdempotencyKey = (columns ?? []).some((column: any) => column.name === 'idempotency_key');
+    if (!hasIdempotencyKey) {
+      await profitSequelize.query(`ALTER TABLE [dbo].[gastos] ADD [idempotency_key] VARCHAR(120) NULL`);
+    }
+    const hasOriginReference = (columns ?? []).some((column: any) => column.name === 'id_origen_referencia');
+    if (!hasOriginReference) {
+      await profitSequelize.query(`ALTER TABLE [dbo].[gastos] ADD [id_origen_referencia] VARCHAR(50) NULL`);
+    }
+    mssqlTableEnsured = true;
+    return;
+  }
+  await profitSequelize.query(
+    `CREATE TABLE dbo.gastos (
+      id_ordenser           BIGINT NULL,
+      idempotency_key       VARCHAR(120) NULL,
+      id_origen_referencia  VARCHAR(50) NULL,
+      codigo_articulo        VARCHAR(30) NULL,
+      codigo_subalmacen      VARCHAR(30) NULL,
+      co_cli                 VARCHAR(30) NULL,
+      co_prov                VARCHAR(30) NULL,
+      fecha_actividad        DATETIME NOT NULL CONSTRAINT DF_gastos_fecha_actividad DEFAULT GETDATE(),
+      cantidad               DECIMAL(18, 4) NULL,
+      unidad                 VARCHAR(10) NULL,
+      horas_trabajadas       DECIMAL(18, 2) NULL,
+      costo_unitario         DECIMAL(18, 4) NULL,
+      costo_total_calculado  DECIMAL(18, 4) NULL,
+      usuario                VARCHAR(50) NULL,
+      nota                   VARCHAR(500) NULL,
+      fecha_create           DATETIME NOT NULL CONSTRAINT DF_gastos_fecha_create DEFAULT GETDATE()
+    )`
+  );
+  mssqlTableEnsured = true;
+}
+
+async function introspectMssqlColumns(): Promise<Set<string>> {
+  const [rows]: any = await profitSequelize.query(
+    `SELECT LOWER(COLUMN_NAME) AS name FROM [INFORMATION_SCHEMA].[COLUMNS] WHERE TABLE_NAME = 'gastos'`
+  );
+  const out = new Set<string>();
+  for (const r of rows ?? []) {
+    if (r?.name) out.add(String(r.name));
+  }
+  return out;
+}
+
+/**
+ * Empuja los gastos locales a MSSQL usando MERGE idempotente basado en
+ * `codigo_articulo` (clave natural legacy) + `ordenId`/`solicitudId`. La
+ * deduplicación adicional se logra mediante `idempotency_key` local.
+ */
+async function upsertGastoToMssql(
+  gasto: Gasto,
+  writeableCols: string[],
+  mergeKeys: string[]
+): Promise<{ updated: boolean }> {
+  const dialect = (profitSequelize.getDialect() || '').toLowerCase();
+  const dateCols = new Set(['fecha_actividad', 'fecha_create']);
+  const valuesByCol: Record<string, any> = {
+    idempotency_key: gasto.idempotency_key ?? gasto.computeIdempotencyKey(),
+    id_origen_referencia: gasto.id_origen_referencia ?? null,
+    id_ordenser: gasto.id_ordenser ?? null,
+    codigo_articulo: gasto.codigo_articulo ?? null,
+    codigo_subalmacen: gasto.codigo_subalmacen ?? null,
+    co_cli: gasto.co_cli ?? null,
+    co_prov: gasto.co_prov ?? 'GEN',
+    fecha_actividad: gasto.fecha_actividad ?? new Date(),
+    cantidad: gasto.cantidad ?? 0,
+    unidad: gasto.unidad ?? null,
+    horas_trabajadas: gasto.horas_trabajadas ?? 0,
+    costo_unitario: gasto.costo_unitario ?? 0,
+    costo_total_calculado: gasto.costo_total_calculado ?? 0,
+    usuario: gasto.usuario ?? '',
+    nota: gasto.nota ?? '',
+    fecha_create: gasto.fecha_create ?? new Date(),
+  };
+  const values = writeableCols.map((c) =>
+    dateCols.has(c) ? toMssqlDateTime(valuesByCol[c]) : valuesByCol[c] ?? null
+  );
+
+  if (dialect === 'mssql' && mergeKeys.length > 0) {
+    const colList = writeableCols.map((c) => `[${c}]`).join(', ');
+    const placeholderList = writeableCols.map(() => '?').join(', ');
+    const onClause = mergeKeys.map((k) => `t.[${k}] = s.[${k}]`).join(' AND ');
+    const updateAssignments = writeableCols
+      .filter((c) => !mergeKeys.includes(c))
+      .map((c) => `t.[${c}] = s.[${c}]`)
+      .join(', ');
+    const whenMatched = updateAssignments
+      ? `WHEN MATCHED THEN UPDATE SET ${updateAssignments}`
+      : `WHEN MATCHED THEN DELETE`;
+    const sql = `
+      MERGE INTO [dbo].[gastos] WITH (HOLDLOCK) AS t
+      USING (SELECT ${placeholderList}) AS s (${colList})
+        ON ${onClause}
+      ${whenMatched}
+      WHEN NOT MATCHED THEN
+        INSERT (${colList}) VALUES (${placeholderList});
+    `;
+    const flat = [...values, ...values];
+    await profitSequelize.query(sql, { replacements: flat });
+    return { updated: false };
+  }
+
+  if (dialect === 'sqlite' && mergeKeys.length > 0) {
+    const colList = writeableCols.map((c) => `"${c}"`).join(', ');
+    const placeholderList = writeableCols.map(() => '?').join(', ');
+    const conflictTarget = mergeKeys.map((c) => `"${c}"`).join(', ');
+    const updateAssignments = writeableCols
+      .filter((c) => !mergeKeys.includes(c))
+      .map((c) => `"${c}" = excluded."${c}"`)
+      .join(', ');
+    const sql = `
+      INSERT INTO gastos (${colList})
+      VALUES (${placeholderList})
+      ON CONFLICT(${conflictTarget}) DO ${updateAssignments ? 'UPDATE SET ' + updateAssignments : 'NOTHING'};
+    `;
+    await profitSequelize.query(sql, { replacements: values });
+    return { updated: false };
+  }
+
+  const colList = writeableCols.map((c) => `[${c}]`).join(', ');
+  const placeholderList = writeableCols.map(() => '?').join(', ');
+  await profitSequelize.query(
+    `INSERT INTO dbo.gastos (${colList}) VALUES (${placeholderList})`,
+    { replacements: values }
+  );
+  return { updated: false };
+}
+
+const TRANSIENT_HINTS = [
+  'Failed to connect', 'ECONNRESET', 'ETIMEDOUT', 'ESOCKET', 'ESERVER',
+  'ConnectionError', 'ECONNREFUSED', 'EHOSTUNREACH', 'LoginError',
+  'socket hang up', 'getaddrinfo', 'ENOTFOUND',
+];
+const isTransient = (msg: string) => TRANSIENT_HINTS.some((h) => msg.toLowerCase().includes(h.toLowerCase()));
+
+/**
+ * Intenta enviar un gasto a MSSQL con reintentos y backoff.
+ * Devuelve la fila actualizada con su estado final.
+ */
+async function upsertWithRetry(
+  gasto: Gasto,
+  writeableCols: string[],
+  mergeKeys: string[],
+  maxAttempts = 5
+): Promise<{ success: boolean; finalError?: string; attempts: number }> {
+  let delay = 1_000;
+  let lastErr: any;
+  let attempts = 0;
+  for (let i = 1; i <= maxAttempts; i++) {
+    attempts = i;
+    try {
+      await upsertGastoToMssql(gasto, writeableCols, mergeKeys);
+      return { success: true, attempts };
+    } catch (err: any) {
+      lastErr = err;
+      const msg = err?.message ?? String(err);
+      if (!isTransient(msg) || i === maxAttempts) {
+        return { success: false, finalError: msg, attempts };
+      }
+      logger.warn(
+        `[GastosService] gasto ${gasto.id} intento ${i} falló (transitorio): ${msg.slice(0, 160)}; reintento en ${delay}ms`
+      );
+      await new Promise((r) => setTimeout(r, delay));
+      // Antes de reintentar, esperamos a que MSSQL vuelva a estar disponible
+      await waitForMssqlReady(15_000, 500);
+      delay = Math.min(delay * 2, 8_000);
+    }
+  }
+  return { success: false, finalError: lastErr?.message, attempts };
+}
+
+/**
+ * Sincroniza los gastos PENDIENTES o en ERROR a MSSQL.
+ *
+ * Por defecto toma filas con `estado_sincronizacion='PENDIENTE'`. Si
+ * `incluirErroneos=true`, también incluye las que estén en 'ERROR'
+ * (con reintentos pendientes).
+ */
+export async function syncGastosToMssql(opts: {
+  limit?: number;
+  incluirErroneos?: boolean;
+  idsPermitidos?: number[];
+} = {}): Promise<SyncReport> {
   const startedAt = Date.now();
   const report: SyncReport = {
     attempted: 0,
     inserted: 0,
+    updated: 0,
     failed: 0,
     errors: [],
     durationMs: 0,
   };
 
-  // 0. Esperar a que MSSQL esté realmente disponible. Si el servidor se recuperó
-  //    pero isMssqlConnectionActive() aún devuelve true mientras las queries
-  //    fallan por timeout, seguimos reintentando con backoff acotado.
+  if (!isMssqlConnectionActive()) {
+    report.errors.push('MSSQL Profit no está disponible; sincronización omitida.');
+    report.durationMs = Date.now() - startedAt;
+    return report;
+  }
+
   const ready = await waitForMssqlReady(20_000, 1_000);
   if (!ready) {
-    report.errors.push('MSSQL Profit no responde tras 20s; sincronización omitida (se reintentará en el próximo ciclo).');
+    report.errors.push('MSSQL no respondió tras 20s; ciclo omitido (se reintentará).');
     report.durationMs = Date.now() - startedAt;
     logger.warn(`[GastosService] MSSQL no responde aún; omitiendo ciclo.`);
     return report;
   }
 
-  // 1. Garantizar la tabla una sola vez por ciclo, no por fila.
   try {
     await ensureMssqlGastosTable();
   } catch (err: any) {
@@ -176,28 +755,22 @@ export async function syncGastosToMssql(opts: { limit?: number } = {}): Promise<
     return report;
   }
 
-  // 2. Descubrir columnas reales para evitar INSERT sobre columnas inexistentes.
   let mssqlColumns: Set<string>;
-  let mergeKeys: string[];
   try {
-    const cols = await introspectMssqlGastosColumns();
-    mssqlColumns = cols;
-    // Columnas que usaremos como clave natural del upsert (omitimos si no existen en MSSQL).
-    mergeKeys = ['ordenId', 'solicitudId', 'codigo_articulo'].filter((k) => mssqlColumns.has(k));
-    if (mergeKeys.length === 0) {
-      // Si no hay ninguna clave natural, caemos a INSERT sin deduplicar.
-      mergeKeys = [];
-    }
+    mssqlColumns = await introspectMssqlColumns();
   } catch (err: any) {
-    report.errors.push(`introspectMssqlGastosColumns: ${err?.message ?? err}`);
+    report.errors.push(`introspectMssqlColumns: ${err?.message ?? err}`);
     report.durationMs = Date.now() - startedAt;
-    logger.error(`[GastosService] No se pudo leer INFORMATION_SCHEMA.COLUMNS: ${err?.message ?? err}`);
     return report;
   }
 
-  // 3. Columnas que vamos a insertar/actualizar: intersección entre las del modelo
-  //    y las existentes en MSSQL. Excluimos columnas locales de control de sync.
+  // Columnas locales que también pueden existir en MSSQL.
+  // Las columnas de control local (id, syncedToMssql, mssqlError, createdAt, updatedAt)
+  // nunca se intentan enviar.
   const localWriteable = [
+    'idempotency_key',
+    'id_origen_referencia',
+    'id_ordenser',
     'codigo_articulo',
     'codigo_subalmacen',
     'co_cli',
@@ -216,52 +789,74 @@ export async function syncGastosToMssql(opts: { limit?: number } = {}): Promise<
     'placa',
   ];
   const writeableCols = localWriteable.filter((c) => mssqlColumns.has(c));
-
   if (writeableCols.length === 0) {
-    report.errors.push(
-      `La tabla dbo.gastos en MSSQL no contiene ninguna columna escribible conocida (${localWriteable.join(', ')}).`
-    );
+    report.errors.push('La tabla dbo.gastos en MSSQL no contiene columnas escribibles conocidas.');
     report.durationMs = Date.now() - startedAt;
-    logger.error(
-      `[GastosService] dbo.gastos sin columnas compatibles con el modelo local; nada que sincronizar.`
-    );
     return report;
   }
 
-  // 4. Leer pendientes.
-  const pending = await Gasto.findAll({
-    where: { syncedToMssql: false },
-    order: [['id', 'ASC']],
-    limit: opts.limit ?? 500,
-  });
+  // Clave natural para MERGE/ON CONFLICT: usamos las primeras 3 columnas
+  // que existan en MSSQL de entre [ordenId, solicitudId, codigo_articulo].
+  // Como fallback, si no existe ninguna, no hay deduplicación.
+  const mergeKeys = mssqlColumns.has('idempotency_key')
+    ? ['idempotency_key']
+    : ['ordenId', 'solicitudId', 'codigo_articulo'].filter((k) => mssqlColumns.has(k));
 
+  // WHERE: filtrar por estado_sincronizacion + (opcional) idsPermitidos
+  const estados: any = opts.incluirErroneos ? ['PENDIENTE', 'ERROR'] : ['PENDIENTE'];
+  const where: any = { estado_sincronizacion: { [Op.in]: estados } };
+  if (opts.idsPermitidos && opts.idsPermitidos.length > 0) {
+    where.id = { [Op.in]: opts.idsPermitidos };
+  }
+
+  const pending = await Gasto.findAll({
+    where,
+    order: [['id', 'ASC']],
+    limit: opts.limit ?? 200,
+  });
   if (pending.length === 0) {
     report.durationMs = Date.now() - startedAt;
     return report;
   }
 
   logger.info(
-    `[GastosService] Sync MSSQL: pendientes=${pending.length} cols_escribibles=${writeableCols.length} claves_upsert=[${mergeKeys.join(',') || 'ninguna'}]`
+    `[GastosService] Sync MSSQL: pendientes=${pending.length} cols=${writeableCols.length} claves=[${mergeKeys.join(',') || 'ninguna'}]`
   );
 
   for (const gasto of pending) {
     report.attempted++;
     try {
-      // Reintento por fila: si el INSERT falla por una caída transitoria del
-      // servidor, esperamos a que vuelva y reintentamos antes de marcar error.
-      await upsertWithRetry(gasto, writeableCols, mergeKeys);
-      gasto.syncedToMssql = true;
-      gasto.mssqlSyncedAt = new Date();
-      gasto.mssqlError = null;
-      await gasto.save();
-      report.inserted++;
+      const r = await upsertWithRetry(gasto, writeableCols, mergeKeys);
+      if (r.success) {
+        gasto.estado_sincronizacion = 'ENVIADO';
+        gasto.syncedToMssql = true;
+        gasto.mssqlSyncedAt = new Date();
+        gasto.mssqlError = null;
+        gasto.intentos_sincronizacion = (gasto.intentos_sincronizacion ?? 0) + r.attempts;
+        await gasto.save();
+        report.inserted++;
+      } else {
+        gasto.estado_sincronizacion = 'ERROR';
+        gasto.syncedToMssql = false;
+        gasto.mssqlError = (r.finalError ?? 'error desconocido').slice(0, 480);
+        gasto.intentos_sincronizacion = (gasto.intentos_sincronizacion ?? 0) + r.attempts;
+        await gasto.save();
+        report.failed++;
+        report.errors.push(`gasto ${gasto.id}: ${r.finalError}`);
+        logger.warn(
+          `[GastosService] gasto ${gasto.id} falló tras ${r.attempts} intento(s): ${r.finalError?.slice(0, 160)}`
+        );
+      }
     } catch (err: any) {
-      report.failed++;
+      // Fallo no-recuperable: marcar ERROR para que el siguiente ciclo reintente.
       const msg = err?.message ?? String(err);
-      report.errors.push(`gasto ${gasto.id}: ${msg}`);
-      logger.warn(`[GastosService] gasto ${gasto.id} falló: ${msg.slice(0, 200)}`);
+      gasto.estado_sincronizacion = 'ERROR';
+      gasto.syncedToMssql = false;
       gasto.mssqlError = msg.slice(0, 480);
+      gasto.intentos_sincronizacion = (gasto.intentos_sincronizacion ?? 0) + 1;
       await gasto.save();
+      report.failed++;
+      report.errors.push(`gasto ${gasto.id}: ${msg}`);
     }
   }
 
@@ -273,312 +868,23 @@ export async function syncGastosToMssql(opts: { limit?: number } = {}): Promise<
 }
 
 /**
- * Lee las columnas reales de `dbo.gastos` desde INFORMATION_SCHEMA.COLUMNS.
- * Devuelve un Set en minúsculas para lookups case-insensitive.
+ * Sincroniza un solo gasto (por evento). Útil para invocar desde hooks
+ * que ya tienen la fila en mano. Devuelve la SyncReport de 1 elemento.
  */
-async function introspectMssqlGastosColumns(): Promise<Set<string>> {
-  const [rows]: any = await profitSequelize.query(
-    `SELECT LOWER(COLUMN_NAME) AS name
-       FROM [INFORMATION_SCHEMA].[COLUMNS]
-      WHERE TABLE_NAME = 'gastos'`
-  );
-  const out = new Set<string>();
-  for (const r of rows ?? []) {
-    if (r?.name) out.add(String(r.name));
-  }
-  return out;
-}
-
-/**
- * Hace ping a MSSQL ejecutando una query trivial. Devuelve `true` en cuanto
- * responde, `false` si se agotó el timeout total.
- */
-async function pingMssql(): Promise<boolean> {
-  try {
-    await profitSequelize.query('SELECT 1 AS ok');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Espera a que MSSQL responda con reintentos. Backoff lineal corto: empezamos
- * en `initialDelayMs` y vamos subiendo hasta `maxDelayMs`. Se rinde cuando se
- * agota `totalTimeoutMs`.
- */
-async function waitForMssqlReady(totalTimeoutMs: number, initialDelayMs: number): Promise<boolean> {
-  const deadline = Date.now() + totalTimeoutMs;
-  let delay = initialDelayMs;
-  const maxDelay = 4_000;
-  let attempt = 0;
-  while (Date.now() < deadline) {
-    attempt++;
-    if (await pingMssql()) return true;
-    await new Promise((r) => setTimeout(r, delay));
-    delay = Math.min(delay + 500, maxDelay);
-  }
-  if (attempt > 0) {
-    logger.warn(`[GastosService] MSSQL no respondió tras ${attempt} intentos en ${totalTimeoutMs}ms.`);
-  }
-  return false;
-}
-
-/**
- * Serializa un valor a un formato aceptable por MSSQL `datetime`.
- * MSSQL acepta el formato simple `'YYYY-MM-DD HH:MM:SS[.fff]'` cuando se pasa
- * como parámetro. ODBC canónico (`{ts '...'}`) NO funciona con Sequelize mssql.
- * Sequelize mssql pasa `Date` como ISO-8601 con 'T' y 'Z', que MSSQL rechaza.
- * Esta función normaliza todos los casos al formato simple UTC.
- */
-function toMssqlDateTime(v: any): string | null {
-  if (v === null || v === undefined) return null;
-  let d: Date | null = null;
-  if (v instanceof Date) {
-    d = v;
-  } else if (typeof v === 'string') {
-    const trimmed = v.trim();
-    // Si ya viene en formato simple, devolver tal cual.
-    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,7})?$/.test(trimmed)) {
-      return trimmed;
-    }
-    // ISO-8601 → parsear y reformatear
-    const parsed = new Date(trimmed);
-    d = isNaN(parsed.getTime()) ? null : parsed;
-  }
-  if (!d || isNaN(d.getTime())) return null;
-  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
-  const y = d.getUTCFullYear();
-  const mo = pad(d.getUTCMonth() + 1);
-  const day = pad(d.getUTCDate());
-  const h = pad(d.getUTCHours());
-  const mi = pad(d.getUTCMinutes());
-  const s = pad(d.getUTCSeconds());
-  const ms = pad(d.getUTCMilliseconds(), 3);
-  return `${y}-${mo}-${day} ${h}:${mi}:${s}.${ms}`;
-}
-
-/**
- * Construye y ejecuta la sentencia de upsert idempotente.
- * - Si MSSQL soporta MERGE (dialecto mssql) → usa MERGE con la clave natural.
- * - Si está en modo fallback SQLite → usa INSERT ... ON CONFLICT.
- * - Si no hay claves naturales → hace un INSERT simple (no idempotente).
- */
-async function upsertGastoToMssql(
-  gasto: Gasto,
-  writeableCols: string[],
-  mergeKeys: string[]
-): Promise<void> {
-  const dialect = (profitSequelize.getDialect() || '').toLowerCase();
-  // Columnas que se serializan como datetime MSSQL. Cualquier otra se envía tal cual.
-  const dateCols = new Set(['fecha_actividad', 'fecha_create']);
-  const valuesByCol: Record<string, any> = {
-    codigo_articulo: gasto.codigo_articulo ?? null,
-    codigo_subalmacen: gasto.codigo_subalmacen ?? null,
-    co_cli: gasto.co_cli ?? null,
-    co_prov: gasto.co_prov ?? 'GEN',
-    fecha_actividad: gasto.fecha_actividad ?? new Date(),
-    cantidad: gasto.cantidad ?? 0,
-    unidad: gasto.unidad ?? null,
-    horas_trabajadas: gasto.horas_trabajadas ?? 0,
-    costo_unitario: gasto.costo_unitario ?? 0,
-    costo_total_calculado: gasto.costo_total_calculado ?? 0,
-    usuario: gasto.usuario ?? '',
-    nota: gasto.nota ?? '',
-    fecha_create: gasto.fecha_create ?? new Date(),
-    ordenId: gasto.ordenId ?? null,
-    solicitudId: gasto.solicitudId ?? null,
-    placa: gasto.placa ?? '',
-  };
-
-  const values = writeableCols.map((c) =>
-    dateCols.has(c) ? toMssqlDateTime(valuesByCol[c]) : valuesByCol[c] ?? null
-  );
-
-  // ── Modo MSSQL: MERGE para idempotencia ────────────────────────────────
-  if (dialect === 'mssql' && mergeKeys.length > 0) {
-    const colList = writeableCols.map((c) => `[${c}]`).join(', ');
-    const placeholderList = writeableCols.map(() => '?').join(', ');
-    const onClause = mergeKeys.map((k) => `t.[${k}] = s.[${k}]`).join(' AND ');
-
-    const updateAssignments = writeableCols
-      .filter((c) => !mergeKeys.includes(c))
-      .map((c) => `t.[${c}] = s.[${c}]`)
-      .join(', ');
-
-    // Si solo hay claves y ninguna columna actualizable, hacemos solo MATCH → noop.
-    const whenMatched = updateAssignments
-      ? `WHEN MATCHED THEN UPDATE SET ${updateAssignments}`
-      : `WHEN MATCHED THEN DELETE`;
-
-    const sql = `
-      MERGE INTO [dbo].[gastos] WITH (HOLDLOCK) AS t
-      USING (SELECT ${placeholderList}) AS s (${colList})
-        ON ${onClause}
-      ${whenMatched}
-      WHEN NOT MATCHED THEN
-        INSERT (${colList}) VALUES (${placeholderList});
-    `;
-    // Sequelize mssql requiere un único set de replacements por query. Pasamos los
-    // valores dos veces: una para el USING source y otra para el INSERT.
-    const flat = [...values, ...values];
-    await profitSequelize.query(sql, { replacements: flat });
-    return;
-  }
-
-  // ── Modo SQLite (fallback offline): INSERT ... ON CONFLICT ─────────────
-  if (dialect === 'sqlite' && mergeKeys.length > 0) {
-    const colList = writeableCols.map((c) => `"${c}"`).join(', ');
-    const placeholderList = writeableCols.map(() => '?').join(', ');
-    const conflictTarget = mergeKeys.map((c) => `"${c}"`).join(', ');
-    const updateAssignments = writeableCols
-      .filter((c) => !mergeKeys.includes(c))
-      .map((c) => `"${c}" = excluded."${c}"`)
-      .join(', ');
-
-    const sql = `
-      INSERT INTO gastos (${colList})
-      VALUES (${placeholderList})
-      ON CONFLICT(${conflictTarget}) DO ${updateAssignments ? 'UPDATE SET ' + updateAssignments : 'NOTHING'};
-    `;
-    await profitSequelize.query(sql, { replacements: values });
-    return;
-  }
-
-  // ── Fallback final: INSERT simple (no idempotente) ─────────────────────
-  const colList = writeableCols.map((c) => `[${c}]`).join(', ');
-  const placeholderList = writeableCols.map(() => '?').join(', ');
-  await profitSequelize.query(
-    `INSERT INTO dbo.gastos (${colList}) VALUES (${placeholderList})`,
-    { replacements: values }
-  );
-}
-
-/**
- * Envuelve `upsertGastoToMssql` con un loop de reintentos que **espera a que
- * MSSQL vuelva** si la query falla por un error de conexión transitorio
- * (ECONNRESET, ESOCKET, ETIMEDOUT, ESERVER, LoginError). Para errores
- * definitivos (Invalid column, conversion, etc.) NO reintenta: falla rápido.
- */
-async function upsertWithRetry(
-  gasto: Gasto,
-  writeableCols: string[],
-  mergeKeys: string[],
-  maxAttempts = 5
-): Promise<void> {
-  const transientHints = [
-    'Failed to connect',
-    'ECONNRESET',
-    'ETIMEDOUT',
-    'ESOCKET',
-    'ESERVER',
-    'ConnectionError',
-    'ECONNREFUSED',
-    'EHOSTUNREACH',
-    'LoginError',
-    'socket hang up',
-    'getaddrinfo',
-  ];
-  const isTransient = (msg: string) =>
-    transientHints.some((h) => msg.toLowerCase().includes(h.toLowerCase()));
-
-  let delay = 1_000;
-  let lastErr: any;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      await upsertGastoToMssql(gasto, writeableCols, mergeKeys);
-      if (attempt > 1) {
-        logger.info(
-          `[GastosService] gasto ${gasto.id} sincronizado tras ${attempt} intentos.`
-        );
-      }
-      return;
-    } catch (err: any) {
-      lastErr = err;
-      const msg = err?.message ?? String(err);
-      if (!isTransient(msg) || attempt === maxAttempts) {
-        throw err;
-      }
-      logger.warn(
-        `[GastosService] gasto ${gasto.id} intento ${attempt} falló (transitorio): ${msg.slice(0, 160)}; reintento en ${delay}ms`
-      );
-      await new Promise((r) => setTimeout(r, delay));
-      // Antes del próximo reintento, esperamos a que MSSQL vuelva a responder
-      // para no martillarlo si está caído.
-      await waitForMssqlReady(15_000, 500);
-      delay = Math.min(delay * 2, 8_000);
-    }
-  }
-  throw lastErr;
-}
-
-let gastosTableEnsured = false;
-async function ensureMssqlGastosTable(): Promise<void> {
-  if (gastosTableEnsured) return;
-  // Sequelize mssql no soporta varios statements en la misma query, así que
-  // primero verificamos existencia y luego, si hace falta, creamos.
-  const [exists]: any = await profitSequelize.query(
-    `SELECT TOP 1 1 AS ok FROM [INFORMATION_SCHEMA].[TABLES] WHERE TABLE_NAME = 'gastos'`
-  );
-  if (exists && exists.length > 0) {
-    gastosTableEnsured = true;
-    return;
-  }
-  await profitSequelize.query(
-    `CREATE TABLE dbo.gastos (
-      codigo_articulo        VARCHAR(30) NULL,
-      codigo_subalmacen      VARCHAR(30) NULL,
-      co_cli                 VARCHAR(30) NULL,
-      co_prov                VARCHAR(30) NULL,
-      fecha_actividad        DATETIME NOT NULL CONSTRAINT DF_gastos_fecha_actividad DEFAULT GETDATE(),
-      cantidad               DECIMAL(18, 4) NULL,
-      unidad                 VARCHAR(10) NULL,
-      horas_trabajadas       DECIMAL(18, 2) NULL,
-      costo_unitario         DECIMAL(18, 4) NULL,
-      costo_total_calculado  DECIMAL(18, 4) NULL,
-      usuario                VARCHAR(50) NULL,
-      nota                   VARCHAR(500) NULL,
-      fecha_create           DATETIME NOT NULL CONSTRAINT DF_gastos_fecha_create DEFAULT GETDATE()
-    )`
-  );
-  gastosTableEnsured = true;
-}
-
-/**
- * Garantiza que todas las solicitudes de repuesto de órdenes aún no cerradas
- * tengan un gasto local. Útil al migrar bases de datos o tras restaurar copias.
- */
-export async function backfillGastosForOpenOrders(): Promise<{ processed: number; created: number; updated: number; skipped: number }> {
-  const solicitudes = await SolicitudRepuesto.findAll({
-    include: [{ model: OrdenServicio, as: 'orden' }],
-  });
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
-
-  for (const s of solicitudes as any[]) {
-    if (!s.orden || s.orden.estado === 'Cerrada') {
-      skipped++;
-      continue;
-    }
-    const before = await Gasto.findOne({ where: { solicitudId: s.id } });
-    const gasto = await ensureLocalGastoForSolicitud(s);
-    if (!gasto) {
-      skipped++;
-      continue;
-    }
-    if (before && before.id === gasto.id) updated++;
-    else created++;
-  }
-
-  return { processed: solicitudes.length, created, updated, skipped };
+export async function syncOneGastoToMssql(gastoId: number): Promise<SyncReport> {
+  return syncGastosToMssql({ limit: 1, idsPermitidos: [gastoId] });
 }
 
 export default {
   findArticuloEspejo,
-  ensureLocalGastoForSolicitud,
-  syncGastosToMssql,
+  validateGastoDraft,
+  ensureLocalGastoForArea,
+  ensureLocalGastoForRepuesto,
+  ensureLocalGastoForExterno,
+  ensureLocalGastoForSolicitud, // alias legacy
   backfillGastosForOpenOrders,
+  backfillGastoOrderIds,
+  resolveFlotaOrdenId,
+  syncGastosToMssql,
+  syncOneGastoToMssql,
 };
-
-void sequelize;

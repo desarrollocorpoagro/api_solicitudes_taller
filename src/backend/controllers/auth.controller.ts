@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User, Company, UserCompany } from '../models';
+import { User, Company, UserCompany, RolePermission } from '../models';
 import { logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'SanLuis_SuperSecret_JWT_2026';
@@ -66,7 +66,7 @@ export class AuthController {
           name: c.name,
           taxId: c.taxId,
           role: 'ADMIN',
-          permissions: [{ module: '*', actions: ['create', 'read', 'update', 'delete', 'approve', 'admin'] }],
+          permissions: [{ module: '*', actions: ['create', 'read', 'update', 'delete', 'approve', 'view_costs', 'admin'] }],
         }));
       } else {
         assignedCompanies = (user.userCompanies || []).map((uc: any) => ({
@@ -187,6 +187,24 @@ export class AuthController {
         effectiveRole = userCompany.role;
         effectivePermissions = userCompany.permissions;
       }
+
+      // Incorporar las acciones definidas en la matriz RBAC al token final.
+      // Esto permite otorgar view_costs a cualquier rol sin depender de que
+      // la membresía de empresa haya sido creada con la matriz antigua.
+      const rolePermissions = await RolePermission.findAll({ where: { role: effectiveRole } });
+      const permissionsByModule = new Map<string, Set<string>>();
+      for (const permission of effectivePermissions) {
+        permissionsByModule.set(permission.module, new Set(permission.actions || []));
+      }
+      for (const permission of rolePermissions) {
+        const actions = permissionsByModule.get(permission.module) || new Set<string>();
+        for (const action of permission.actions || []) actions.add(action);
+        permissionsByModule.set(permission.module, actions);
+      }
+      effectivePermissions = Array.from(permissionsByModule.entries()).map(([module, actions]) => ({
+        module,
+        actions: Array.from(actions),
+      }));
 
       // Token JWT Final de Sesión Multi-Tenant
       const finalToken = jwt.sign(

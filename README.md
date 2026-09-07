@@ -119,3 +119,62 @@ Una vez iniciado el servidor, acceda a la documentación visual interactiva:
 - **Responsable de Flota:** `flota@empresasanluis.com` / `Password123!`
 - **Almacén:** `almacen@empresasanluis.com` / `Password123!`
 - **Mecánico:** `jose.ramirez@empresasanluis.com` / `Password123!`
+
+---
+
+## 💰 Flujo Unificado de Gastos (AREA · REPUESTO · EXTERNO)
+
+La tabla local **`gastos`** consolida los tres orígenes de costo de una orden de taller y los replica a `dbo.gastos` en **Profit Plus MSSQL** con un state machine idempotente.
+
+### Diagrama de flujo
+
+```
+SolicitudRepuesto ─┐
+SolicitudExterno  ─┼─► ensureLocalGasto*() ─► INSERT/UPDATE local
+OrdenArea         ─┘                              │
+                                                   ▼
+                                          estado_sincronizacion
+                                          PENDIENTE → ENVIADO / ERROR
+                                                   │
+                                                   ▼
+                                       syncGastosToMssql()
+                                       (cada 60s + por evento)
+                                                   │
+                                                   ▼
+                                          dbo.gastos (MSSQL)
+```
+
+### Características clave
+
+| Característica | Implementación |
+| --- | --- |
+| **Trazabilidad** | Columnas `tipo_origen` + `id_origen_referencia` apuntan al origen del costo. |
+| **Idempotencia** | `idempotency_key = "${tipo_origen}:${id_origen_referencia}"` evita duplicados. |
+| **State machine** | `estado_sincronizacion` ∈ {`PENDIENTE`, `ENVIADO`, `ERROR`} con campo `intentos_sincronizacion`. |
+| **Reintentos** | Backoff exponencial + `waitForMssqlReady()` para errores transitorios. |
+| **Introspección** | Solo se envían las columnas que existen en `dbo.gastos` real (vía `INFORMATION_SCHEMA.COLUMNS`). |
+| **Compatibilidad** | MERGE para MSSQL, `ON CONFLICT` para SQLite, INSERT plano como fallback. |
+| **Auditoría** | Las filas no se borran al cerrar la orden; se preserva la trazabilidad histórica. |
+
+### Hooks automáticos (sin acción manual)
+
+| Modelo | Evento | Acción |
+| --- | --- | --- |
+| `SolicitudRepuesto` | `afterCreate` | `ensureLocalGastoForRepuesto(solicitud)` |
+| `SolicitudRepuesto` | `afterUpdate` (cambia `estadoAprobacion`/`estadoEntrega`/`costoUnitario`/`cant`) | `ensureLocalGastoForRepuesto(solicitud)` |
+| `SolicitudExterno` | `afterUpdate` (cambia `estadoAprobacion='Aprobada'`) | `ensureLocalGastoForExterno(solicitud)` |
+| `OrdenArea` | `afterCreate` (con `horas > 0`) | `ensureLocalGastoForArea(area)` |
+| `OrdenArea` | `afterUpdate` (cambia `horas`/`tarifaHora`/`estado`) | `ensureLocalGastoForArea(area)` |
+
+### Verificación
+
+```bash
+# Smoke test E2E (login multi-tenant, stats, backfill, sync, sync-por-id, idempotencia, validación)
+node scripts/test-gastos-flow.cjs
+```
+
+El script ejecuta 6 pasos y finaliza con `✔ TODOS LOS PASOS PASARON` (exit 0).
+
+### Endpoints
+
+Ver sección **6.5** de [ENDPOINTS.md](./ENDPOINTS.md) para la especificación completa de `GET|POST /api/v1/gastos`, `/gastos/sync`, `/gastos/sync/:id`, `/gastos/backfill`, `/gastos/regenerate`, `/gastos/stats`.

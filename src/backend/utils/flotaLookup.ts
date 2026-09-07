@@ -1,5 +1,22 @@
 import { profitMirrorSequelize } from '../config/profitDb';
 
+export async function resolveVendedorCedula(value?: string | null): Promise<string | null> {
+  const search = String(value ?? '').trim();
+  if (!search) return null;
+
+  const [rows]: any = await profitMirrorSequelize.query(
+    `SELECT cedula, ven_des
+     FROM vw_flota_vendedores
+     WHERE LTRIM(RTRIM(cedula)) = LTRIM(RTRIM(?))
+        OR LOWER(LTRIM(RTRIM(ven_des))) = LOWER(LTRIM(RTRIM(?)))
+     LIMIT 1`,
+    { replacements: [search, search] }
+  );
+
+  const cedula = String(rows?.[0]?.cedula ?? '').trim();
+  return cedula || search;
+}
+
 export interface FlotaLookupResult {
   placa: string;
   placa_anterior?: string | null;

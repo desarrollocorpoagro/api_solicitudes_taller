@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { CatalogoRepuesto } from '../models';
 import { ErpService } from '../services/erp.service';
 import { logger } from '../utils/logger';
+import { profitMirrorSequelize } from '../config/profitDb';
 
 export class CatalogoController {
   /**
@@ -9,7 +10,43 @@ export class CatalogoController {
    */
   static async getCatalogo(req: Request, res: Response) {
     try {
-      const repuestos = await CatalogoRepuesto.findAll({ order: [['desc', 'ASC']] });
+      const [rows]: any = await profitMirrorSequelize.query(
+        `SELECT codigo_profit, nombre_producto, costo, codigo_subalmacen,
+                sub_almacen, almacen, stock_act
+         FROM vw_flota_articulos
+         ORDER BY nombre_producto ASC`
+      );
+
+      const grouped = new Map<string, any>();
+      for (const row of rows ?? []) {
+        const code = String(row.codigo_profit ?? '').trim();
+        if (!code) continue;
+        const item = grouped.get(code) ?? {
+          cod: code,
+          desc: String(row.nombre_producto ?? '').trim(),
+          costo: Number(row.costo ?? 0),
+          stock: 0,
+          stockCentral: 0,
+          codigoSubalmacen: '01',
+          almacen: String(row.almacen ?? row.sub_almacen ?? '').trim(),
+          categoria: null,
+        };
+        const rawSubalmacen = String(row.codigo_subalmacen ?? '').trim();
+        const subalmacen = rawSubalmacen === '0' || rawSubalmacen === '00'
+          ? '00'
+          : rawSubalmacen === '1' || rawSubalmacen === '01'
+            ? '01'
+            : rawSubalmacen;
+        const stock = Number(row.stock_act ?? 0);
+        if (subalmacen === '00') item.stockCentral += stock;
+        if (subalmacen === '01') {
+          item.stock += stock;
+          item.almacen = String(row.almacen ?? row.sub_almacen ?? item.almacen).trim();
+        }
+        grouped.set(code, item);
+      }
+
+      const repuestos = Array.from(grouped.values());
       const erpStatus = await ErpService.syncInventoryFromProfit();
 
       return res.json({

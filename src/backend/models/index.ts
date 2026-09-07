@@ -22,7 +22,8 @@ import SyncQueue, { initSyncQueueModel } from './SyncQueue.model';
 import { initGastoModel, Gasto } from './Gasto.model';
 import { profitSequelize, profitMirrorSequelize, initProfitDatabase, getProfitConnectionStatus } from '../config/profitDb';
 import { logger } from '../utils/logger';
-import { ensureLocalGastoForSolicitud } from '../services/gastos.service';
+// (los hooks de gastos están definidos más abajo en este archivo; importan
+// ensureLocalGasto* desde '../services/gastos.service' por su cuenta.)
 
 // Definición de Relaciones Multi-Tenant y de Órdenes
 User.hasMany(UserCompany, { foreignKey: 'userId', as: 'userCompanies' });
@@ -81,9 +82,24 @@ export {
 // Inicializar el modelo Gasto contra la base local y garantizar su tabla.
 initGastoModel(sequelize);
 
-// Hook transaccional: cada SolicitudRepuesto nueva genera automáticamente un
-// registro en la tabla `gastos` local siempre que la orden padre NO esté
-// cerrada. Mantiene la relación de dominio sin acoplarse al trigger MSSQL.
+// ─── Hooks transaccionales para captura de gastos ───────────────────────────
+//
+// Cada SolicitudRepuesto nueva genera un Gasto local (tipo_origen='REPUESTO').
+// Cada SolicitudExterno aprobada genera un Gasto local (tipo_origen='EXTERNO').
+// Cada OrdenArea con horas registradas genera un Gasto local (tipo_origen='AREA').
+//
+// Los hooks afterUpdate se disparan cuando cambia el estado funcional
+// (aprobación, despacho, horas, etc.) y vuelven a llamar a la función
+// ensureLocalGasto* que es IDEMPOTENTE: actualiza el monto en el mismo
+// registro (misma idempotency_key) y lo marca PENDIENTE para reintento
+// de sincronización con MSSQL.
+
+import {
+  ensureLocalGastoForSolicitud,
+  ensureLocalGastoForExterno,
+  ensureLocalGastoForArea,
+} from '../services/gastos.service';
+
 SolicitudRepuesto.afterCreate(async (solicitud, _options) => {
   try {
     await ensureLocalGastoForSolicitud(solicitud);
@@ -91,6 +107,132 @@ SolicitudRepuesto.afterCreate(async (solicitud, _options) => {
     logger.warn(`[GastosHook] No se pudo crear gasto para solicitud ${solicitud.id}: ${err.message}`);
   }
 });
+
+SolicitudRepuesto.afterUpdate(async (solicitud, _options) => {
+  try {
+    // Si cambió estadoAprobacion a 'Aprobada' o estadoEntrega a 'Entregado',
+    // refrescar el gasto local. ensureLocalGasto* es idempotente.
+    if (
+      solicitud.changed('estadoAprobacion') ||
+      solicitud.changed('estadoEntrega') ||
+      solicitud.changed('costoUnitario') ||
+      solicitud.changed('cant')
+    ) {
+      await ensureLocalGastoForSolicitud(solicitud);
+    }
+  } catch (err: any) {
+    logger.warn(`[GastosHook] No se pudo refrescar gasto para solicitud ${solicitud.id}: ${err.message}`);
+  }
+});
+
+SolicitudExterno.afterCreate(async (solicitud, _options) => {
+  // Sólo creamos gasto al aprobarse, no al crearse la solicitud.
+  // Pero dejamos el hook para registrar un placeholder si el usuario lo
+  // requiere en el futuro. Por ahora, sólo logueamos.
+  logger.debug(`[GastosHook] SolicitudExterno ${solicitud.id} creada (gasto se crea al aprobar).`);
+});
+
+SolicitudExterno.afterUpdate(async (solicitud, _options) => {
+  try {
+    if (
+      solicitud.changed('estadoAprobacion') ||
+      solicitud.changed('costoEfectivo') ||
+      solicitud.changed('costoCotizado')
+    ) {
+      if (solicitud.estadoAprobacion === 'Aprobada') {
+        await ensureLocalGastoForExterno(solicitud);
+      }
+    }
+  } catch (err: any) {
+    logger.warn(`[GastosHook] No se pudo crear gasto externo para solicitud ${solicitud.id}: ${err.message}`);
+  }
+});
+
+OrdenArea.afterCreate(async (area, _options) => {
+  try {
+    if (Number(area.horas ?? 0) > 0) {
+      await ensureLocalGastoForArea(area);
+    }
+  } catch (err: any) {
+    logger.warn(`[GastosHook] No se pudo crear gasto de área ${area.id}: ${err.message}`);
+  }
+});
+
+OrdenArea.afterUpdate(async (area, _options) => {
+  try {
+    if (
+      area.changed('horas') ||
+      area.changed('tarifaHora') ||
+      area.changed('costoManoObra') ||
+      area.changed('estado')
+    ) {
+      // Si cambia el estado a 'cerrada', el siguiente ciclo del sync ya
+      // no replicará porque la consulta a OrdenServicio devolverá 'Cerrada'.
+      // No eliminamos el gasto histórico (mantiene auditoría).
+      if (area.estado === 'cerrada' && Number(area.horas ?? 0) > 0) {
+        await ensureLocalGastoForArea(area);
+      } else if (Number(area.horas ?? 0) > 0) {
+        await ensureLocalGastoForArea(area);
+      }
+    }
+  } catch (err: any) {
+    logger.warn(`[GastosHook] No se pudo refrescar gasto de área ${area.id}: ${err.message}`);
+  }
+});
+
+/**
+ * Copia la matriz de permisos del rol de cada usuario en `user_permissions`,
+ * únicamente para aquellos usuarios que aún no tengan overrides propios.
+ *
+ * - Idempotente: respeta overrides manuales existentes (no los duplica ni sobrescribe).
+ * - Seguro: si el rol no tiene reglas o el usuario está inactivo, no falla.
+ * - Trazabilidad: marca cada fila con `notes` para distinguir herencia vs override.
+ */
+export async function seedUserPermissionsFromRoles(): Promise<{ processed: number; created: number; skipped: number }> {
+  let processed = 0;
+  let created = 0;
+  let skipped = 0;
+
+  try {
+    const users = await User.findAll();
+    for (const user of users) {
+      processed++;
+
+      // Si el usuario ya tiene filas en user_permissions, lo dejamos tal cual.
+      const existing = await UserPermission.count({ where: { userId: user.id } });
+      if (existing > 0) {
+        skipped++;
+        continue;
+      }
+
+      // Cargar la matriz de su rol.
+      const rolePerms = await RolePermission.findAll({ where: { role: user.role } });
+      if (rolePerms.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      const rows = rolePerms.map((rp) => ({
+        userId: user.id,
+        module: rp.module,
+        actions: rp.actions,
+        isGranted: true,
+        notes: `Heredado de rol ${user.role} (semilla inicial)`,
+      }));
+
+      await UserPermission.bulkCreate(rows);
+      created += rows.length;
+    }
+
+    logger.info(
+      `[Seed] user_permissions poblado por rol: usuarios=${processed} creadas=${created} ya_existían=${skipped}`
+    );
+  } catch (err: any) {
+    logger.error(`[Seed] Error poblando user_permissions desde role_permissions: ${err.message}`);
+  }
+
+  return { processed, created, skipped };
+}
 
 /**
  * Semilla inicial de datos para demostración y puesta en marcha inmediata.
@@ -177,109 +319,7 @@ export const seedInitialData = async () => {
           { module: 'fleet', actions: ['read', 'update'] },
           { module: 'inventory', actions: ['read', 'create'] },
         ],
-      },
-      {
-        id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-        fullName: 'Lic. Mariana Rojas (Responsable Flota)',
-        email: 'flota@empresasanluis.com',
-        password: 'Password123!',
-        phone: '+58 416 3334455',
-        role: 'RESPONSABLE_FLOTA',
-        isActive: true,
-        companies: [comp1?.id],
-        permissions: [
-          { module: 'fleet', actions: ['read', 'create', 'update'] },
-          { module: 'taller', actions: ['read', 'create'] },
-          { module: 'reports', actions: ['read'] },
-        ],
-      },
-      {
-        id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
-        fullName: 'José Ramírez (Técnico Mecánico)',
-        email: 'jose.ramirez@empresasanluis.com',
-        password: 'Password123!',
-        phone: '+58 424 4445566',
-        role: 'MECANICO',
-        isActive: true,
-        companies: [comp1?.id],
-        permissions: [
-          { module: 'taller', actions: ['read', 'update'] },
-          { module: 'inventory', actions: ['read', 'create'] },
-        ],
-      },
-      {
-        id: '34343434-3434-3434-3434-343434343434',
-        fullName: 'Denny Castillo (Mecánico 1 / Taller)',
-        email: 'mecanico@empresasanluis.com',
-        password: 'Password123!',
-        phone: '+58 412 8889900',
-        role: 'MECANICO',
-        isActive: true,
-        companies: [comp1?.id],
-        permissions: [
-          { module: 'taller', actions: ['read', 'update'] },
-          { module: 'inventory', actions: ['read', 'create'] },
-        ],
-      },
-      {
-        id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-        fullName: 'Pedro Morales (Almacén Central TLL-01)',
-        email: 'almacen@empresasanluis.com',
-        password: 'Password123!',
-        phone: '+58 412 5556677',
-        role: 'ALMACENISTA',
-        isActive: true,
-        companies: [comp1?.id],
-        permissions: [
-          { module: 'inventory', actions: ['read', 'dispatch', 'requisition'] },
-          { module: 'taller', actions: ['read'] },
-          { module: 'reports', actions: ['read'] },
-        ],
-      },
-      {
-        id: '56565656-5656-5656-5656-565656565656',
-        fullName: 'Lic. Francisco Rivas (Auditor de Calidad)',
-        email: 'auditor@empresasanluis.com',
-        password: 'Password123!',
-        phone: '+58 414 9991122',
-        role: 'AUDITOR',
-        isActive: true,
-        companies: [comp1?.id],
-        permissions: [
-          { module: 'taller', actions: ['read'] },
-          { module: 'fleet', actions: ['read'] },
-          { module: 'inventory', actions: ['read'] },
-          { module: 'reports', actions: ['read', 'export'] },
-        ],
-      },
-      {
-        id: '78787878-7878-7878-7878-787878787878',
-        fullName: 'Ing. Roberto Gómez (Solicitante Operaciones)',
-        email: 'solicitante@empresasanluis.com',
-        password: 'Password123!',
-        phone: '+58 416 2223344',
-        role: 'SOLICITANTE',
-        isActive: true,
-        companies: [comp1?.id],
-        permissions: [
-          { module: 'taller', actions: ['read', 'create'] },
-          { module: 'fleet', actions: ['read'] },
-        ],
-      },
-      {
-        id: '90909090-9090-9090-9090-909090909090',
-        fullName: 'Luis Márquez (Operador / Conductor)',
-        email: 'operador@empresasanluis.com',
-        password: 'Password123!',
-        phone: '+58 424 5556677',
-        role: 'OPERADOR',
-        isActive: true,
-        companies: [comp1?.id],
-        permissions: [
-          { module: 'taller', actions: ['read'] },
-          { module: 'fleet', actions: ['read'] },
-        ],
-      },
+      }      
     ];
 
     for (const u of usersToSeed) {
@@ -322,224 +362,53 @@ export const seedInitialData = async () => {
     // Aquí consultamos el espejo SQLite para no tocar la tabla legacy `flota_vehicular`.
     const [flotaMirrorCount]: any = await profitMirrorSequelize.query('SELECT COUNT(*) AS c FROM flota_vehiculos');
     const flotaCount = parseInt(flotaMirrorCount?.[0]?.c ?? '0', 10) || 0;
-    if (flotaCount === 0) {
-      // await FlotaVehicular.bulkCreate([
-      //   // Empresa 1: TRANSPORTE SAN LUIS DE LARA, C.A.
-      //   {
-      //     placa: 'A12BC3D',
-      //     companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
-      //     marca: 'Chevrolet NPR',
-      //     anio: 2019,
-      //     tipo: 'Camión 5t',
-      //     empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
-      //     cc: '3021',
-      //     km: 184320,
-      //     qrCode: 'SL-VEH-A12BC3D-3021',
-      //     historialOsAnterior: 'OS-2026-00089',
-      //     historialDias: 18,
-      //     historialArea: 'Reparaciones mayores',
-      //   },
-      //   {
-      //     placa: 'A99ZZ11',
-      //     companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
-      //     marca: 'Mack Granite',
-      //     anio: 2018,
-      //     tipo: 'Chuto Pesado 30t',
-      //     empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
-      //     cc: '3022',
-      //     km: 310450,
-      //     qrCode: 'SL-VEH-A99ZZ11-3022',
-      //   },
-      //   {
-      //     placa: 'A44TR88',
-      //     companyId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
-      //     marca: 'Ford Cargo 1721',
-      //     anio: 2020,
-      //     tipo: 'Camión Plataforma',
-      //     empresa: 'TRANSPORTE SAN LUIS DE LARA, C.A.',
-      //     cc: '3023',
-      //     km: 215600,
-      //     qrCode: 'SL-VEH-A44TR88-3023',
-      //   },
-
-      //   // Empresa 2: SAN LUIS TRANSPORTE, C.A.
-      //   {
-      //     placa: 'B77XY9Z',
-      //     companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
-      //     marca: 'Toyota Hilux 4x4',
-      //     anio: 2021,
-      //     tipo: 'Pick-up Campo',
-      //     empresa: 'SAN LUIS TRANSPORTE, C.A.',
-      //     cc: '1140',
-      //     km: 96540,
-      //     qrCode: 'SL-VEH-B77XY9Z-1140',
-      //     historialOsAnterior: 'OS-2026-00045',
-      //     historialDias: 40,
-      //     historialArea: 'Mantenimiento Preventivo',
-      //   },
-      //   {
-      //     placa: 'B22AG55',
-      //     companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
-      //     marca: 'John Deere 6125J',
-      //     anio: 2022,
-      //     tipo: 'Tractor Agrícola',
-      //     empresa: 'SAN LUIS TRANSPORTE, C.A.',
-      //     cc: '1141',
-      //     km: 4520,
-      //     qrCode: 'SL-VEH-B22AG55-1141',
-      //   },
-      //   {
-      //     placa: 'B88CC12',
-      //     companyId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
-      //     marca: 'Chevrolet D-Max',
-      //     anio: 2020,
-      //     tipo: 'Pick-up Supervisión',
-      //     empresa: 'SAN LUIS TRANSPORTE, C.A.',
-      //     cc: '1142',
-      //     km: 142100,
-      //     qrCode: 'SL-VEH-B88CC12-1142',
-      //   },
-
-        
-      // ]);
-      logger.info('[Seed] Maestro de Flota Vehicular poblado exitosamente para todas las empresas.');
+    if (flotaCount === 0) {     
+      logger.info('[Seed] Maestro de Flota Vehicular  limpio y  en espera de sincronizacion  exitosamente para todas las empresas.');
     }
 
     // 4. Semilla de Catálogo de Repuestos
+    //    DECISIÓN: las tablas de dominio operativo (catalogo_repuestos,
+    //    ordenes_servicio, ordenes_area, ordenes_servicio_auditoria) se
+    //    mantienen VACÍAS por diseño. Deben poblarse únicamente desde MSSQL
+    //    Profit Plus vía MasterSyncService o desde la UI (apertura real de
+    //    órdenes). Si necesitas datos de prueba, usa scripts/insert-demo-*.cjs
+    //    o crea las órdenes desde la pantalla de Apertura. NO reactivar
+    //    los bulkCreate comentados a continuación: el seed solo verifica
+    //    que estén vacías y registra el estado.
     const repuestoCount = await CatalogoRepuesto.count();
     if (repuestoCount === 0) {
-      // await CatalogoRepuesto.bulkCreate([
-      //   { cod: 'FRE-0234', desc: 'Disco de freno delantero', stock: 6, costo: 82.00, almacen: 'TLL-01', categoria: 'Frenos' },
-      //   { cod: 'ROD-0087', desc: 'Rodamiento de maza delantera', stock: 0, costo: 164.00, almacen: 'TLL-01', categoria: 'Tren Delantero' },
-      //   { cod: 'FIL-0112', desc: 'Filtro de aceite', stock: 2, costo: 12.40, almacen: 'TLL-01', categoria: 'Filtros' },
-      //   { cod: 'PAS-0301', desc: 'Juego de pastillas de freno', stock: 11, costo: 48.90, almacen: 'TLL-01', categoria: 'Frenos' },
-      //   { cod: 'COR-0455', desc: 'Kit de correa de distribución', stock: 1, costo: 1290.00, almacen: 'TLL-01', categoria: 'Motor' },
-      //   { cod: 'ACE-0010', desc: 'Aceite motor 15W40 (litro)', stock: 80, costo: 6.20, almacen: 'TLL-01', categoria: 'Lubricantes' },
-      //   { cod: 'FIL-0889', desc: 'Filtro de combustible Diesel R90P', stock: 15, costo: 24.50, almacen: 'TLL-01', categoria: 'Filtros' },
-      //   { cod: 'HID-0105', desc: 'Aceite hidráulico ISO 68 (galón)', stock: 20, costo: 18.30, almacen: 'TLL-01', categoria: 'Lubricantes' },
-      // ]);
-      logger.info('[Seed] Catálogo de Repuestos poblado exitosamente.');
+      logger.info('[Seed] catalogo_repuestos: 0 filas (vacía, en espera de sincronización desde MSSQL o de captura manual).');
+    } else {
+      logger.info(`[Seed] catalogo_repuestos: ${repuestoCount} filas (NO se modifica; poblado por MasterSyncService/UI).`);
     }
 
     // 5. Semilla de Órdenes de Servicio por Empresa
+    //    Política: la tabla NO se repuebla desde el seed. El operador la
+    //    puebla desde la UI (botón "Aperturar Nueva Orden") o mediante la
+    //    sincronización desde MSSQL. El seed sólo reporta el estado actual
+    //    y, si hay órdenes, lista únicamente las que están en estatus
+    //    "Cerrada" para visibilidad operativa al arranque.
     const ordenCount = await OrdenServicio.count();
     if (ordenCount === 0) {
-      // Orden 1: TRANSPORTE SAN LUIS DE LARA, C.A.
-      const demoOrder1 = await OrdenServicio.create({
-        id: 'OS-2026-00101',
-        tenantId: comp1 ? comp1.id : '11111111-1111-1111-1111-111111111111',
-        placa: 'A12BC3D',
-        km: 184320,
-        recibidoPor: 'Ing. Carlos Mendoza',
-        entregadoPor: 'Luis Márquez (Operador)',
-        sintomas: 'Ruido metálico al frenar y vibración en el volante sobre 60 km/h.',
-        fotosCount: 1,
-        esReincidencia: true,
-        osAnterior: 'OS-2026-00089',
-        motivoReincidencia: 'Falla distinta, misma área',
-        estado: 'En Proceso',
-        fechaApertura: new Date(),
-        totalRepuestos: 82.00,
-        totalManoObra: 36.00,
-        totalExternos: 0.00,
-        totalGeneral: 118.00,
+      logger.info('[Seed] ordenes_servicio: 0 filas (vacía, en espera de apertura real o sincronización).');
+    } else {
+      logger.info(`[Seed] ordenes_servicio: ${ordenCount} filas (NO se modifica).`);
+      const ordenesCerradas = await OrdenServicio.findAll({
+        where: { estado: 'Cerrada' },
+        attributes: ['id', 'placa', 'estado', 'fechaEntrega', 'totalGeneral', 'recibeConforme'],
+        order: [['fechaEntrega', 'DESC']],
       });
-
-      const demoArea1 = await OrdenArea.create({
-        id: 'OT-A1',
-        ordenId: demoOrder1.id,
-        area: 'Reparaciones mayores',
-        fechaRecepcion: new Date(),
-        mecanico: 'José Ramírez',
-        diagnostico: 'Desgaste severo en discos delanteros y holgura en terminales.',
-        horas: 2,
-        tarifaHora: 18,
-        costoManoObra: 36.00,
-        estado: 'abierta',
-      });
-
-      await SolicitudRepuesto.create({
-        ordenId: demoOrder1.id,
-        otId: demoArea1.id,
-        cod: 'FRE-0234',
-        desc: 'Disco de freno delantero',
-        cant: 1,
-        costoUnitario: 82.00,
-        costoTotal: 82.00,
-        stockActual: 6,
-        motivo: 'Reemplazo preventivo por alabeo excesivo.',
-        estadoAprobacion: 'Pendiente',
-        estadoEntrega: 'Por entregar',
-        almacen: 'TLL-01',
-        requiereEscalamiento: false,
-      });
-
-      // Orden 2: SAN LUIS TRANSPORTE, C.A.
-      const demoOrder2 = await OrdenServicio.create({
-        id: 'OS-2026-00201',
-        tenantId: comp2 ? comp2.id : '22222222-2222-2222-2222-222222222222',
-        placa: 'B77XY9Z',
-        km: 96540,
-        recibidoPor: 'Ing. Carlos Mendoza',
-        entregadoPor: 'Marcos Rivas (Operador Agro)',
-        sintomas: 'Mantenimiento preventivo 100,000 km y sustitución de filtros de combustible y aceite.',
-        fotosCount: 0,
-        esReincidencia: false,
-        estado: 'Abierta',
-        fechaApertura: new Date(),
-        totalRepuestos: 36.90,
-        totalManoObra: 25.00,
-        totalExternos: 0.00,
-        totalGeneral: 61.90,
-      });
-
-      const demoArea2 = await OrdenArea.create({
-        id: 'OT-B1',
-        ordenId: demoOrder2.id,
-        area: 'Mantenimiento Preventivo',
-        fechaRecepcion: new Date(),
-        mecanico: 'José Ramírez',
-        diagnostico: 'Revisión periódica de fluidos, correas y filtros.',
-        horas: 1.5,
-        tarifaHora: 18,
-        costoManoObra: 27.00,
-        estado: 'abierta',
-      });
-
-      await SolicitudRepuesto.create({
-        ordenId: demoOrder2.id,
-        otId: demoArea2.id,
-        cod: 'FIL-0112',
-        desc: 'Filtro de aceite',
-        cant: 1,
-        costoUnitario: 12.40,
-        costoTotal: 12.40,
-        stockActual: 2,
-        motivo: 'Mantenimiento preventivo periódico.',
-        estadoAprobacion: 'Aprobada',
-        estadoEntrega: 'Por entregar',
-        almacen: 'TLL-01',
-        requiereEscalamiento: false,
-      });
-
-            
-      // Semilla inicial de Auditoría y Trazabilidad para OS-2026-00101
-      await OrdenAuditLog.bulkCreate([
-        {
-          ordenId: demoOrder1.id,
-          otId: demoArea1.id,
-          userName: 'José Ramírez',
-          userEmail: 'mecanico@empresasanluis.com',
-          userRole: 'MECANICO',
-          action: 'SOLICITUD_REPUESTO',
-          fieldName: 'FRE-0234',
-          newValue: '1 unidad ($82.00)',
-          description: `Solicitud de 1 unidad del repuesto FRE-0234 (Disco de freno delantero) por alabeo excesivo.`,
-          ipAddress: '192.168.1.102',
-        },
-      ]);
-
-      logger.info('[Seed] Órdenes de Servicio y Bitácoras de Auditoría inicializadas para todas las empresas.');
+      if (ordenesCerradas.length === 0) {
+        logger.info('[Seed] ordenes_servicio (Cerrada): 0 órdenes cerradas registradas.');
+      } else {
+        logger.info(`[Seed] ordenes_servicio (Cerrada): ${ordenesCerradas.length} órdenes:`);
+        for (const o of ordenesCerradas as any[]) {
+          const cierre = o.fechaEntrega ? new Date(o.fechaEntrega).toISOString().slice(0, 19).replace('T', ' ') : 'sin fecha';
+          const total = Number(o.totalGeneral ?? 0).toFixed(2);
+          const conforme = o.recibeConforme ? `recibe: ${o.recibeConforme}` : 'sin recibe';
+          logger.info(`[Seed]   • ${o.id} | placa=${o.placa ?? 's/p'} | entrega=${cierre} | total=$${total} | ${conforme}`);
+        }
+      }
     }
 
     // 8. Semilla de Conexión de Base de Datos MSSQL Profit Plus (AD_TRANS)
@@ -574,7 +443,7 @@ export const seedInitialData = async () => {
     if (permCount === 0) {
       const defaultRolePerms = [
         // ADMIN (Acceso Total)
-        { role: 'ADMIN', module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'admin'], description: 'Control total de órdenes de taller' },
+        { role: 'ADMIN', module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'view_costs', 'admin'], description: 'Control total de órdenes de taller y costos de mano de obra' },
         { role: 'ADMIN', module: 'fleet', actions: ['read', 'create', 'update', 'delete', 'admin'], description: 'Control total del maestro de flota' },
         { role: 'ADMIN', module: 'almacen', actions: ['read', 'create', 'update', 'delete', 'dispatch', 'admin'], description: 'Control total de almacén e inventario' },
         { role: 'ADMIN', module: 'aprobaciones', actions: ['read', 'approve', 'reject', 'admin'], description: 'Aprobación y autorización de órdenes y gastos' },
@@ -633,6 +502,21 @@ export const seedInitialData = async () => {
       }
       logger.info(`[Seed] Matriz RBAC inicializada con ${defaultRolePerms.length} reglas de permisos por rol.`);
     }
+
+    // Evolución idempotente: el administrador conserva acceso a costos aunque
+    // la matriz RBAC ya existiera antes de agregar la acción específica.
+    const adminTallerPermission = await RolePermission.findOne({ where: { role: 'ADMIN', module: 'taller' } });
+    if (adminTallerPermission && !adminTallerPermission.actions.includes('view_costs')) {
+      adminTallerPermission.actions = [...adminTallerPermission.actions, 'view_costs'];
+      await adminTallerPermission.save();
+    }
+
+    // 10. Semilla de Permisos Personalizados por Usuario (override layer)
+    // Para cada usuario que aún no tenga filas en user_permissions, se copia
+    // la matriz de su rol como punto de partida. Los administradores pueden
+    // luego ajustar individualmente vía PUT /api/v1/roles-permissions/user/:userId.
+    // Esta función es idempotente: si el usuario ya tiene overrides, no los duplica.
+    await seedUserPermissionsFromRoles();
 
     logger.info('[Seed] Inicialización de base de datos completada satisfactoriamente.');
   } catch (error) {

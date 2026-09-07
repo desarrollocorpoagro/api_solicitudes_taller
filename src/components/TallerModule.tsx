@@ -286,6 +286,11 @@ export const TallerModule: React.FC<{
   const [recibeConforme, setRecibeConforme] = useState('');
   const [fEntrega, setFEntrega] = useState('');
 
+  // Solicitud de Área inicial (obligatoria para aperturar la orden)
+  const [areaInicial, setAreaInicial] = useState('');
+  const [mecanicoAreaInicial, setMecanicoAreaInicial] = useState('José Ramírez');
+  const [diagnosticoInicial, setDiagnosticoInicial] = useState('');
+
   // Listas maestras desde Profit Plus MSSQL (ad_trans)
   const [mecanicosList, setMecanicosList] = useState<MecanicoProfitItem[]>([]);
   const [mecanicosLoading, setMecanicosLoading] = useState(false);
@@ -342,44 +347,56 @@ export const TallerModule: React.FC<{
     }
   }, [ordNo]);
 
-  const TALLER_TAB_ACCESS: Record<TallerTabId, Array<'read' | 'update' | 'approve' | 'admin'>> = {
-    apertura: ['read'],
-    areas: ['read', 'update'],
-    repuestos: ['read'],
-    externos: ['read'],
-    aprob: ['read', 'approve'],
-    almacen: ['read'],
-    cierre: ['read', 'update', 'admin'],
-    auditoria: ['read'],
+  /**
+ * Mapeo data-driven de las pestañas de taller contra las acciones que el rol
+ * debe tener en el módulo `taller` para poder ver/usar la pestaña.
+ *
+ * Cada pestaña requiere la acción de escritura correspondiente (no solo `read`):
+ *  - apertura:   crear nuevas órdenes de servicio.
+ *  - areas:      registrar mano de obra y diagnóstico (update).
+ *  - repuestos:  solicitar repuestos a almacén (create).
+ *  - externos:   solicitar servicios externos (create).
+ *  - aprob:      aprobar/rechazar solicitudes (approve).
+ *  - almacen:    confirmar despachos (dispatch).
+ *  - cierre:     cerrar la orden y emitir liquidación (admin).
+ *  - auditoria:  solo lectura — basta con `read`.
+ *
+ * Los roles que solo tienen `read` en `taller` (ALMACENISTA, OPERADOR, AUDITOR)
+ * no podrán abrir ninguna pestaña operativa, pero sí verán "auditoría" porque
+ * es de solo lectura. ADMIN (acciones con `admin`) satisface cualquier requisito.
+ */
+  const TALLER_TAB_WRITE: Record<TallerTabId, string[]> = {
+    apertura: ['create', 'admin'],
+    areas: ['update', 'admin'],
+    repuestos: ['create', 'admin'],
+    externos: ['create', 'admin'],
+    aprob: ['approve', 'admin'],
+    almacen: ['dispatch', 'admin'],
+    cierre: ['admin'],
+    auditoria: ['read', 'admin'],
   };
 
   const canAccessTab = (tabId: TallerTabId) => {
-    const required = TALLER_TAB_ACCESS[tabId] || ['read'];
-    const actions = rolePerms?.taller || [];
-    if (rolePerms && Object.keys(rolePerms).length > 0 && actions.length === 0) return false;
+    // Si los permisos aún no han llegado, mostramos todo (modo compatibilidad).
+    // En cuanto `rolePerms` se materializa (incluso vacío), se respeta estrictamente.
     if (!rolePerms) return true;
-    return required.some((action) => actions.includes(action));
+    const perms = rolePerms.taller || [];
+    // Rol sin permisos cargados → denegar.
+    if (perms.length === 0) return false;
+    // ADMIN u override con acción `admin` → acceso total.
+    if (perms.includes('admin')) return true;
+    // Cualquier otra acción califica para la pestaña correspondiente.
+    return TALLER_TAB_WRITE[tabId].some((a) => perms.includes(a));
   };
 
-  // Cambiar pestaña activa por defecto según el rol del usuario autenticado
-  useEffect(() => {
-    if (currentUser?.role) {
-      const role = currentUser.role.toUpperCase();
-      if (role === 'MECANICO') {
-        setActiveTab('areas');
-      } else if (role === 'ALMACENISTA') {
-        setActiveTab('almacen');
-      } else if (role === 'AUDITOR') {
-        setActiveTab('auditoria');
-      } else if (role === 'GERENTE_TALLER' || role === 'SUPERVISOR') {
-        setActiveTab('aprob');
-      } else if (role === 'RESPONSABLE_FLOTA' || role === 'SOLICITANTE' || role === 'OPERADOR') {
-        setActiveTab('apertura');
-      }
-    }
-  }, [currentUser?.role]);
+  const canViewLaborCosts = Boolean(
+    currentUser?.role?.toUpperCase() === 'ADMIN' || rolePerms?.taller?.includes('view_costs')
+  );
 
-  // Sincronizar pestaña interna cuando el menú superior cambia la fase seleccionada
+  // Si el menú superior pasa una `initialTab` y aún no estamos en ella, sincronizamos.
+  // NO forzamos una pestaña por nombre de rol: la pestaña activa debe respetar la
+  // intención del usuario (clic en top-nav o en `initialTab`). El fallback a la
+  // primera pestaña visible se aplica más abajo, en el effect sobre `visibleTabs`.
   useEffect(() => {
     if (initialTab && initialTab !== activeTab) {
       setActiveTab(initialTab);
@@ -484,12 +501,23 @@ export const TallerModule: React.FC<{
         setCompanyOrders(ordenesEmpresa);
       }
 
-      // 3. Sincronizar orden o vehículo inicial para la empresa seleccionada
-      if (ordenesEmpresa.length > 0) {
-        const primeraOrden = ordenesEmpresa[0];
+      // 3. Sincronizar orden o vehículo inicial para la empresa seleccionada.
+      //    Preferencia: primera orden NO cerrada (Abierta o En Proceso). Si
+      //    todas están cerradas, se ofrece crear una nueva.
+      const ordenesNoCerradas = ordenesEmpresa.filter((o: any) => o.estado !== 'Cerrada');
+      if (ordenesNoCerradas.length > 0) {
+        const primeraOrden = ordenesNoCerradas[0];
         setOrdNo(primeraOrden.id);
         setPlaca(primeraOrden.placa);
+        setEstadoOrden(primeraOrden.estado || 'Abierta');
         await consultarPlaca(primeraOrden.placa);
+      } else if (ordenesEmpresa.length > 0) {
+        // Todas las órdenes previas están cerradas: inicializar en modo "Aperturar".
+        setOrdNo(`OS-${new Date().getFullYear()}-NUEVA`);
+        setEstadoOrden('Abierta');
+        setOts([]);
+        setReps([]);
+        setExts([]);
       } else if (flotaEmpresa.length > 0) {
         const primerVehiculo = flotaEmpresa[0];
         setPlaca(primerVehiculo.placa);
@@ -604,6 +632,20 @@ export const TallerModule: React.FC<{
       alert('Debe identificar una unidad perteneciente a la empresa activa antes de aperturar la orden.');
       return;
     }
+    if (!areaInicial.trim()) {
+      alert('Debe seleccionar el Área de Servicio antes de aperturar la orden de servicio.');
+      // Hacer scroll al campo para que el usuario lo vea
+      const el = document.getElementById('apertura-area-input');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (el as HTMLInputElement | null)?.focus?.();
+      }
+      return;
+    }
+    if (!mecanicoAreaInicial.trim()) {
+      alert('Debe indicar el mecánico asignado al área solicitada.');
+      return;
+    }
     if (!sintomas.trim()) {
       alert('Debe registrar los síntomas o motivo de ingreso reportados.');
       return;
@@ -627,9 +669,36 @@ export const TallerModule: React.FC<{
 
       const data = await res.json();
       if (data.success) {
-        showToast(`¡Orden ${data.data.id} aperturada con éxito para ${unidad.empresa}!`);
-        setOrdNo(data.data.id);
+        const nuevaOrdenId = data.data.id;
+        showToast(`¡Orden ${nuevaOrdenId} aperturada con éxito para ${unidad.empresa}!`);
+
+        // 2. Crear la primera Orden de Área (sub-OT) con el área y mecánico seleccionados.
+        // Si esto falla, la orden ya quedó abierta y el operador puede crear el área
+        // manualmente desde la pestaña 02 Áreas; sólo se reporta el warning.
+        try {
+          const resArea = await authFetch(`/api/v1/ordenes/${nuevaOrdenId}/areas`, {
+            method: 'POST',
+            body: JSON.stringify({
+              area: areaInicial.trim(),
+              mecanico: mecanicoAreaInicial.trim(),
+              diagnostico: diagnosticoInicial.trim() || `Triaje inicial generado al aperturar la orden ${nuevaOrdenId}.`,
+              horas: 1,
+            }),
+          });
+          const dataArea = await resArea.json();
+          if (dataArea.success) {
+            showToast(`Área "${areaInicial}" creada y asignada a ${mecanicoAreaInicial}.`);
+          } else {
+            showToast(`Orden creada, pero no se pudo crear el área automáticamente: ${dataArea.error}`, 'err');
+          }
+        } catch (areaErr: any) {
+          showToast(`Orden creada, pero falló la creación del área: ${areaErr.message}`, 'err');
+        }
+
+        setOrdNo(nuevaOrdenId);
         setEstadoOrden('Abierta');
+        setAreaInicial('');
+        setDiagnosticoInicial('');
         // Refrescar órdenes de la empresa
         const resOrdenes = await authFetch('/api/v1/ordenes');
         const dataOrdenes = await resOrdenes.json();
@@ -932,15 +1001,19 @@ export const TallerModule: React.FC<{
                   setReps([]);
                   setExts([]);
                   setSintomas('');
+                  setAreaInicial('');
+                  setDiagnosticoInicial('');
                 }
               }}
               style={{ padding: '6px 12px', fontSize: 13, minWidth: 160 }}
             >
-              {companyOrders.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.id} - {o.placa} ({o.estado})
-                </option>
-              ))}
+              {companyOrders
+                .filter((o) => o.estado !== 'Cerrada')
+                .map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.id} - {o.placa} ({o.estado})
+                  </option>
+                ))}
               <option value={`OS-${new Date().getFullYear()}-NUEVA`}>➕ Aperturar Nueva Orden</option>
             </select>
             <button
@@ -951,6 +1024,8 @@ export const TallerModule: React.FC<{
                 setReps([]);
                 setExts([]);
                 setSintomas('');
+                setAreaInicial('');
+                setDiagnosticoInicial('');
                 setActiveTab('apertura');
               }}
               className="btn"
@@ -986,30 +1061,45 @@ export const TallerModule: React.FC<{
               <span className="k">Órdenes de Área</span>
               <span className="v">{ots.length}</span>
             </div>
-            <div>
-              <span className="k">Costo Acumulado</span>
-              <span className="v" style={{ color: 'var(--navy)', fontWeight: 700 }}>${totalGeneral.toFixed(2)}</span>
-            </div>
+            {canViewLaborCosts && (
+              <div>
+                <span className="k">Costo Acumulado</span>
+                <span className="v" style={{ color: 'var(--navy)', fontWeight: 700 }}>${totalGeneral.toFixed(2)}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Navegación por pestañas (Fase 1 Taller) */}
-      <div className="tabs" style={{ borderRadius: 'var(--r)', marginBottom: 16 }}>
-        <div className="tabs-in">
-          {visibleTabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id as any)}
-              className={`tab ${activeTab === t.id ? 'active' : ''} ${t.flag ? 'flag' : ''}`}
-              aria-selected={activeTab === t.id}
-            >
-              <span className="num">{t.num}</span>
-              {t.label}
-              <span className="dot" />
-            </button>
-          ))}
-        </div>
+      {/* Indicador de fase actual: la navegación principal está en el sidebar lateral.
+          Aquí solo se muestra un breadcrumb para que el usuario sepa dónde está. */}
+      <div className="phase-breadcrumb" style={{ marginBottom: 16 }}>
+        {(() => {
+          const current = visibleTabs.find((t) => t.id === activeTab);
+          if (!current) return null;
+          return (
+            <div className="card" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span
+                className="chip"
+                style={{ background: 'var(--navy)', color: '#ffffff', fontWeight: 700, fontSize: 11 }}
+              >
+                {current.num}
+              </span>
+              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)' }}>{current.label}</span>
+              {current.flag && (
+                <span
+                  className="chip"
+                  style={{ background: 'rgba(255, 184, 0, 0.18)', color: '#a86a00', fontWeight: 600, fontSize: 11 }}
+                >
+                  ● Pendiente
+                </span>
+              )}
+              <span className="hint" style={{ marginLeft: 'auto', marginBottom: 0, fontSize: 11 }}>
+                Usa el menú lateral para cambiar de fase
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* PANELES */}
@@ -1462,15 +1552,118 @@ export const TallerModule: React.FC<{
               placeholder="Describe lo que reporta el operador..."
             />
           </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <button
+              onClick={() => setFotosCount(fotosCount + 1)}
+              className="btn"
+            >
+              <Upload className="w-3.5 h-3.5 text-[var(--navy)]" /> Adjuntar fotografía
+            </button>
+            <span style={{ fontSize: 13, color: 'var(--slate)' }}>{fotosCount} fotografía(s) adjunta(s)</span>
+          </div>
+        </div>
+
+        {/* Solicitud de Área — OBLIGATORIA para aperturar la orden.
+            Ubicada DEBAJO de la card "Síntomas reportados" según requerimiento. */}
+        <div className="card" id="apertura-solicitud-area">
+          <h2>
+            Solicitud de Área <span className="req" style={{ fontSize: 12 }}>* obligatoria</span>
+          </h2>
+          <p className="hint">
+            Toda apertura de orden debe indicar el área de servicio donde se ejecutará la
+            primera intervención. Se creará automáticamente la primera orden de área (sub-OT)
+            al confirmar la apertura.
+          </p>
+
+          <div className="grid g3" style={{ marginBottom: 14 }}>
+            <label className="f">
+              <span className="req">Área de Servicio</span>
+              <Autocomplete
+                value={areaInicial}
+                onChange={setAreaInicial}
+                placeholder="Buscar área (Reparaciones mayores, Mtto correctivo…)"
+                options={[
+                  'Mtto preventivo',
+                  'Reparaciones mayores',
+                  'Mtto correctivo',
+                  'Metalmecánica',
+                  'Latonería y pintura',
+                  'Cauchera',
+                  'Lavado',
+                ].map((a) => ({ value: a, label: a }))}
+              />
+              <input
+                id="apertura-area-input"
+                type="hidden"
+                value={areaInicial}
+                onChange={(e) => setAreaInicial(e.target.value)}
+              />
+            </label>
+            <label className="f">
+              <span className="req">Mecánico Asignado al Área</span>
+              <Autocomplete
+                value={mecanicoAreaInicial}
+                onChange={setMecanicoAreaInicial}
+                placeholder="Nombre del mecánico responsable"
+                options={
+                  mecanicosList.length > 0
+                    ? mecanicosList.map((m) => ({
+                        value: m.nombre,
+                        label: `${m.nombre}${m.cargo ? ` — ${m.cargo}` : ''}`,
+                        subLabel: `[${m.codigo}]`,
+                      }))
+                    : [
+                        { value: 'José Gregorio Hernández Ramírez', label: 'José Gregorio Hernández Ramírez', subLabel: '[V11587399]' },
+                        { value: 'Luis Márquez', label: 'Luis Márquez' },
+                        { value: 'Ana Peña', label: 'Ana Peña' },
+                        { value: 'Carlos Ojeda', label: 'Carlos Ojeda' },
+                        { value: 'Miguel Sanz', label: 'Miguel Sanz' },
+                      ]
+                }
+              />
+            </label>
+            <label className="f">
+              <span>Horas estimadas</span>
+              <input
+                type="number"
+                step="0.5"
+                min="0.5"
+                value={1}
+                readOnly
+                className="mono"
+                title="Horas estimadas iniciales (se pueden ajustar después desde la pestaña Áreas)"
+              />
+            </label>
+          </div>
+
+          <label className="f" style={{ marginBottom: 8 }}>
+            <span>Diagnóstico / Triaje inicial (opcional)</span>
+            <textarea
+              value={diagnosticoInicial}
+              onChange={(e) => setDiagnosticoInicial(e.target.value)}
+              placeholder="Hallazgo técnico preliminar que motiva la apertura del área…"
+              rows={3}
+            />
+          </label>
+
+          {!areaInicial.trim() && (
+            <div className="note n-bad" style={{ marginBottom: 12, fontSize: 12 }}>
+              <b>Validación de Negocio:</b> la apertura de la orden de servicio
+              requiere que se seleccione el <b>Área de Servicio</b> y se indique el{' '}
+              <b>Mecánico Asignado</b>. Ambos campos son obligatorios.
+            </div>
+          )}
+        </div>
+
+        {/* Acciones de apertura: botones al final, después de Solicitud de Área */}
+        <div className="card" style={{ background: 'var(--paper)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button
-                onClick={() => setFotosCount(fotosCount + 1)}
-                className="btn"
-              >
-                <Upload className="w-3.5 h-3.5 text-[var(--navy)]" /> Adjuntar fotografía
-              </button>
-              <span style={{ fontSize: 13, color: 'var(--slate)' }}>{fotosCount} fotografía(s) adjunta(s)</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: 'var(--slate)' }}>
+              <span className="hint" style={{ marginBottom: 0 }}>
+                {estadoOrden === 'Cerrada'
+                  ? 'Esta orden ya fue cerrada. No se puede modificar.'
+                  : 'Confirme los datos capturados para aperturar la orden.'}
+              </span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -1496,9 +1689,20 @@ export const TallerModule: React.FC<{
 
               <button
                 onClick={handleCrearNuevaOrden}
-                disabled={creandoOrden || !unidad || !sintomas.trim()}
+                disabled={
+                  creandoOrden
+                  || !unidad
+                  || !sintomas.trim()
+                  || !areaInicial.trim()
+                  || !mecanicoAreaInicial.trim()
+                }
                 className="btn dark"
                 style={{ padding: '8px 18px', fontWeight: 600 }}
+                title={
+                  !areaInicial.trim() || !mecanicoAreaInicial.trim()
+                    ? 'Complete el campo Solicitud de Área antes de aperturar la orden'
+                    : 'Crear la orden de servicio'
+                }
               >
                 {creandoOrden ? 'Aperturando...' : `💾 Aperturar Nueva Orden para ${activeCompany?.code || 'Empresa'}`}
               </button>
@@ -1604,7 +1808,7 @@ export const TallerModule: React.FC<{
                     onChange={(e) => handleUpdateArea(ot.id, { diagnostico: e.target.value })}
                   />
                 </label>
-                <div className="grid g3" style={{ background: 'var(--paper)', padding: 12, borderRadius: 'var(--r)', marginBottom: 12 }}>
+                <div className={`grid ${canViewLaborCosts ? 'g3' : 'g2'}`} style={{ background: 'var(--paper)', padding: 12, borderRadius: 'var(--r)', marginBottom: 12 }}>
                   <div>
                     <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Horas MO:</span>
                     <input
@@ -1616,14 +1820,18 @@ export const TallerModule: React.FC<{
                       style={{ marginTop: 4 }}
                     />
                   </div>
-                  <div>
-                    <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Tarifa:</span>
-                    <div className="mono font-bold" style={{ marginTop: 8 }}>${ot.tarifaHora}/h</div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Costo MO:</span>
-                    <div className="mono font-bold" style={{ marginTop: 8, color: 'var(--navy)' }}>${Number(ot.costoManoObra).toFixed(2)}</div>
-                  </div>
+                  {canViewLaborCosts && (
+                    <>
+                      <div>
+                        <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Tarifa:</span>
+                        <div className="mono font-bold" style={{ marginTop: 8 }}>${ot.tarifaHora}/h</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Costo MO:</span>
+                        <div className="mono font-bold" style={{ marginTop: 8, color: 'var(--navy)' }}>${Number(ot.costoManoObra).toFixed(2)}</div>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="row-end">
                   <button
@@ -1669,7 +1877,7 @@ export const TallerModule: React.FC<{
                 options={catalogo.map((c) => ({
                   value: c.cod,
                   label: `${c.cod} — ${c.desc}`,
-                  subLabel: `Stock: ${c.stock} · $${Number(c.costo || 0).toFixed(2)}`,
+                  subLabel: `Stock: ${Number(c.stock || 0)} · Central: ${Number(c.stockCentral || 0)}`,
                 }))}
                 emptyMessage="No hay repuestos en el catálogo."
               />
@@ -1995,30 +2203,34 @@ export const TallerModule: React.FC<{
           </div>
 
           <h2>Liquidación Financiera</h2>
-          <p className="hint">El costo se imputa a la empresa propietaria de la unidad y a su centro de costo.</p>
+          {canViewLaborCosts && (
+            <>
+              <p className="hint">El costo se imputa a la empresa propietaria de la unidad y a su centro de costo.</p>
 
-          <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Componente</th>
-                  <th className="num">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>Repuestos aprobados</td><td className="num mono">${totalRepuestos.toFixed(2)}</td></tr>
-                <tr><td>Mano de obra ({ots.reduce((a, b) => a + b.horas, 0)} hrs)</td><td className="num mono">${totalManoObra.toFixed(2)}</td></tr>
-                <tr><td>Servicios externos</td><td className="num mono">${totalExternos.toFixed(2)}</td></tr>
-                {serviciosGarantia > 0 && (
-                  <tr><td style={{ color: 'var(--info)' }}>Servicios cubiertos por garantía</td><td className="num font-bold" style={{ color: 'var(--info)' }}>{serviciosGarantia} sin costo</td></tr>
-                )}
-                <tr style={{ background: 'var(--paper)', fontWeight: 'bold' }}>
-                  <td>Total imputado a {unidad?.empresa || 'Empresa'} • CC {unidad?.cc || 'N/A'}</td>
-                  <td className="num mono" style={{ color: 'var(--navy)', fontSize: 16 }}>${totalGeneral.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+              <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Componente</th>
+                      <th className="num">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>Repuestos aprobados</td><td className="num mono">${totalRepuestos.toFixed(2)}</td></tr>
+                    <tr><td>Mano de obra ({ots.reduce((a, b) => a + b.horas, 0)} hrs)</td><td className="num mono">${totalManoObra.toFixed(2)}</td></tr>
+                    <tr><td>Servicios externos</td><td className="num mono">${totalExternos.toFixed(2)}</td></tr>
+                    {serviciosGarantia > 0 && (
+                      <tr><td style={{ color: 'var(--info)' }}>Servicios cubiertos por garantía</td><td className="num font-bold" style={{ color: 'var(--info)' }}>{serviciosGarantia} sin costo</td></tr>
+                    )}
+                    <tr style={{ background: 'var(--paper)', fontWeight: 'bold' }}>
+                      <td>Total imputado a {unidad?.empresa || 'Empresa'} • CC {unidad?.cc || 'N/A'}</td>
+                      <td className="num mono" style={{ color: 'var(--navy)', fontSize: 16 }}>${totalGeneral.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="card">
@@ -2107,10 +2319,12 @@ export const TallerModule: React.FC<{
             <b>{puedeCerrar ? 'Listo para cerrar' : 'Cierre bloqueado'}</b>
             <span>{puedeCerrar ? 'Sin pendientes en ninguna orden de área.' : validaciones[0]}</span>
           </div>
-          <div className="tot">
-            <small>Costo acumulado</small>
-            ${totalGeneral.toFixed(2)}
-          </div>
+          {canViewLaborCosts && (
+            <div className="tot">
+              <small>Costo acumulado</small>
+              ${totalGeneral.toFixed(2)}
+            </div>
+          )}
         </div>
       </div>
     </div>

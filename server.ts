@@ -11,7 +11,7 @@ import fs from 'fs';
 import swaggerUi from 'swagger-ui-express';
 import { createServer as createViteServer } from 'vite';
 
-import { initDatabase } from './src/backend/config/database';
+import { initDatabase, sequelize } from './src/backend/config/database';
 import { initProfitDatabase, initProfitMirrorSchema, seedProfitMirrorFromMain } from './src/backend/config/profitDb';
 import { seedInitialData } from './src/backend/models';
 import apiRoutes from './src/backend/routes';
@@ -133,6 +133,9 @@ async function startServer() {
   // 8. Inicialización de Bases de Datos (Principal y MSSQL Profit AD_TRANS)
   try {
     await initDatabase();
+    await sequelize.sync();
+    await ensureAuditTableSchema();
+    await ensureChildOrderPlacaColumns();
     await seedInitialData();
     await initProfitDatabase();
     // Asegurar que el espejo SQLite local (./data/profit_ad_trans.sqlite) tenga las tablas
@@ -154,6 +157,47 @@ async function startServer() {
     logger.error(`[DatabaseInit] Error inicializando bases de datos: ${dbErr.message}`);
   }
 
+
+async function ensureChildOrderPlacaColumns() {
+  const tables = ['ordenes_area', 'solicitudes_repuestos', 'solicitudes_externos'];
+  for (const table of tables) {
+    const [columns]: any = await sequelize.query(`PRAGMA table_info('${table}')`);
+    const hasPlaca = (columns ?? []).some((column: any) => String(column.name).toLowerCase() === 'placa');
+    if (!hasPlaca) {
+      await sequelize.query(`ALTER TABLE ${table} ADD COLUMN placa VARCHAR(30) NOT NULL DEFAULT ''`);
+    }
+    await sequelize.query(
+      `UPDATE ${table}
+       SET placa = UPPER(TRIM((SELECT placa FROM ordenes_servicio WHERE ordenes_servicio.id = ${table}.ordenId)))
+       WHERE (placa IS NULL OR TRIM(placa) = '')
+         AND EXISTS (SELECT 1 FROM ordenes_servicio WHERE ordenes_servicio.id = ${table}.ordenId AND TRIM(ordenes_servicio.placa) <> '')`
+    );
+  }
+}
+
+async function ensureAuditTableSchema() {
+  const columns: Record<string, string> = {
+    otId: 'VARCHAR(50) NULL',
+    action: "VARCHAR(60) NOT NULL DEFAULT 'MODIFICACION_CAMPO'",
+    fieldName: "VARCHAR(100) NOT NULL DEFAULT 'general'",
+    previousValue: 'TEXT NULL',
+    newValue: 'TEXT NULL',
+    description: "TEXT NOT NULL DEFAULT ''",
+    userId: 'UUID NULL',
+    userName: "VARCHAR(150) NOT NULL DEFAULT 'Sistema / Usuario Operativo'",
+    userEmail: "VARCHAR(150) NOT NULL DEFAULT 'sistema@empresasanluis.com'",
+    userRole: "VARCHAR(50) NOT NULL DEFAULT 'OPERATIVO'",
+    ipAddress: 'VARCHAR(50) NULL',
+  };
+  const [existing]: any = await sequelize.query("PRAGMA table_info('ordenes_servicio_auditoria')");
+  const existingNames = new Set((existing ?? []).map((column: any) => String(column.name).toLowerCase()));
+  for (const [name, definition] of Object.entries(columns)) {
+    if (!existingNames.has(name.toLowerCase())) {
+      await sequelize.query(`ALTER TABLE ordenes_servicio_auditoria ADD COLUMN ${name} ${definition}`);
+      logger.info(`[AuditBootstrap] Columna '${name}' agregada a ordenes_servicio_auditoria.`);
+    }
+  }
+}
   app.listen(PORT, '0.0.0.0', () => {
     logger.info(`========================================================`);
     logger.info(`🚜 [San Luis Backend] Servidor Express activo en puerto ${PORT}`);
@@ -180,6 +224,9 @@ async function ensureGastosTableAndBackfill() {
     await sequelize.query(
       `CREATE TABLE IF NOT EXISTS gastos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo_origen VARCHAR(20),
+        id_origen_referencia VARCHAR(50),
+        idempotency_key VARCHAR(120),
         codigo_articulo VARCHAR(30),
         codigo_subalmacen VARCHAR(30),
         co_cli VARCHAR(30),
@@ -190,12 +237,16 @@ async function ensureGastosTableAndBackfill() {
         horas_trabajadas DECIMAL(18, 2) DEFAULT 0,
         costo_unitario DECIMAL(18, 4),
         costo_total_calculado DECIMAL(18, 4),
+        monto DECIMAL(18, 4) DEFAULT 0,
         usuario VARCHAR(50) DEFAULT '',
         nota VARCHAR(500) DEFAULT '',
         fecha_create DATETIME,
         ordenId VARCHAR(50),
         solicitudId VARCHAR(50),
+        id_ordenser BIGINT NULL,
         placa VARCHAR(30) DEFAULT '',
+        estado_sincronizacion VARCHAR(20) DEFAULT 'PENDIENTE',
+        intentos_sincronizacion INTEGER DEFAULT 0,
         syncedToMssql TINYINT(1) DEFAULT 0,
         mssqlSyncedAt DATETIME,
         mssqlError VARCHAR(500),
@@ -203,25 +254,58 @@ async function ensureGastosTableAndBackfill() {
         updatedAt DATETIME
       )`
     );
-    // Migración idempotente: añadir columna placa a tablas existentes que
-    // fueron creadas antes de este cambio. SQLite no soporta IF NOT EXISTS
-    // en ALTER TABLE ADD COLUMN, por lo que comprobamos antes en information_schema.
-    try {
-      const [cols]: any = await sequelize.query(
-        `SELECT LOWER(name) AS name FROM pragma_table_info('gastos')`
-      );
-      const hasPlaca = (cols ?? []).some((c: any) => String(c.name).toLowerCase() === 'placa');
-      if (!hasPlaca) {
-        await sequelize.query(`ALTER TABLE gastos ADD COLUMN placa VARCHAR(30) DEFAULT ''`);
-        logger.info(`[GastosBootstrap] Migración: columna 'placa' agregada a tabla gastos.`);
+    // Migración idempotente: añade columnas nuevas a tablas preexistentes.
+    // SQLite no soporta IF NOT EXISTS en ALTER TABLE ADD COLUMN, por lo que
+    // comprobamos contra pragma_table_info antes de cada ALTER.
+    const ensureColumn = async (col: string, ddl: string) => {
+      try {
+        const [cols]: any = await sequelize.query(`SELECT LOWER(name) AS name FROM pragma_table_info('gastos')`);
+        const has = (cols ?? []).some((c: any) => String(c.name).toLowerCase() === col.toLowerCase());
+        if (!has) {
+          await sequelize.query(`ALTER TABLE gastos ADD COLUMN ${ddl}`);
+          logger.info(`[GastosBootstrap] Migración: columna '${col}' agregada a tabla gastos.`);
+        }
+      } catch (e: any) {
+        logger.warn(`[GastosBootstrap] No se pudo verificar/agregar columna ${col}: ${e.message}`);
       }
-    } catch (migErr: any) {
-      logger.warn(`[GastosBootstrap] No se pudo verificar/agregar columna placa: ${migErr.message}`);
+    };
+    await ensureColumn('placa', `placa VARCHAR(30) DEFAULT ''`);
+    await ensureColumn('tipo_origen', `tipo_origen VARCHAR(20)`);
+    await ensureColumn('id_origen_referencia', `id_origen_referencia VARCHAR(50)`);
+    await ensureColumn('idempotency_key', `idempotency_key VARCHAR(120)`);
+    await ensureColumn('monto', `monto DECIMAL(18, 4) DEFAULT 0`);
+    await ensureColumn('estado_sincronizacion', `estado_sincronizacion VARCHAR(20) DEFAULT 'PENDIENTE'`);
+    await ensureColumn('intentos_sincronizacion', `intentos_sincronizacion INTEGER DEFAULT 0`);
+    await ensureColumn('id_ordenser', `id_ordenser BIGINT NULL`);
+
+    // Backfill: poblar idempotency_key y tipo_origen para filas existentes
+    // que aún no los tengan (preserva registros creados con la versión previa).
+    try {
+      await sequelize.query(
+        `UPDATE gastos
+            SET idempotency_key = COALESCE(idempotency_key, 'LEGACY:' || ordenId || ':' || id)
+          WHERE idempotency_key IS NULL OR idempotency_key = ''`
+      );
+      await sequelize.query(
+        `UPDATE gastos
+            SET estado_sincronizacion = COALESCE(estado_sincronizacion,
+              CASE WHEN syncedToMssql = 1 THEN 'ENVIADO' ELSE 'PENDIENTE' END)
+          WHERE estado_sincronizacion IS NULL OR estado_sincronizacion = ''`
+      );
+      await sequelize.query(
+        `UPDATE gastos
+            SET monto = COALESCE(monto, costo_total_calculado, 0)
+          WHERE monto IS NULL`
+      );
+    } catch (bf: any) {
+      logger.warn(`[GastosBootstrap] Backfill columnas lógicas parcial: ${bf.message}`);
     }
-    const { backfillGastosForOpenOrders } = await import('./src/backend/services/gastos.service');
+
+    const { backfillGastosForOpenOrders, backfillGastoOrderIds } = await import('./src/backend/services/gastos.service');
     const summary = await backfillGastosForOpenOrders();
+    const orderIdSummary = await backfillGastoOrderIds();
     logger.info(
-      `[GastosBootstrap] Tabla gastos OK. Backfill: processed=${summary.processed} created=${summary.created} updated=${summary.updated} skipped=${summary.skipped}`
+      `[GastosBootstrap] Tabla gastos OK. Backfill: processed=${summary.processed} created=${summary.created} updated=${summary.updated} skipped=${summary.skipped} id_ordenser_actualizados=${orderIdSummary}`
     );
     void Gasto; // Mantener el modelo cargado para tipado
   } catch (err: any) {

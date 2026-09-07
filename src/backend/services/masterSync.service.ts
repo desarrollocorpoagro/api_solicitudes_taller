@@ -8,6 +8,7 @@ import FlotaOrdenServicioProfit from '../models/FlotaOrdenServicioProfit.model';
 import CatalogoRepuesto from '../models/CatalogoRepuesto.model';
 import FlotaVehicular from '../models/FlotaVehicular.model';
 import { logger } from '../utils/logger';
+import { resolveVendedorCedula } from '../utils/flotaLookup';
 
 /**
  * Devuelve una conexión Sequelize apuntando a MSSQL Profit AD_TRANS.
@@ -1025,12 +1026,13 @@ export class MasterSyncService {
       for (const [nroOrden, local] of localMap.entries()) {
         if (!remoteMap.has(nroOrden)) {
           try {
+            const entregadoPorCedula = await resolveVendedorCedula(local.entregado_por);
             await FlotaOrdenServicioProfit.create({
               nro_orden: local.nro_orden,
               Placa: local.Placa,
               km_horometro: local.km_horometro,
               recibido_por: local.recibido_por,
-              entregado_por: local.entregado_por ?? null,
+              entregado_por: entregadoPorCedula,
               fec_apertura: local.fec_apertura ?? new Date(),
               fec_cierre: local.fec_cierre ?? null,
               sintomas_reportados: local.sintomas_reportados ?? '',

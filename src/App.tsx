@@ -140,6 +140,46 @@ const filterNavItemsByRole = (
     .filter((x): x is NavItem => x !== null);
 };
 
+/**
+ * SidebarGroup: un agrupador (p.ej. "Taller San Luis") con sus items hijo.
+ * El padre no es clickeable; los hijos sí. Cada hijo puede marcarse como activo.
+ */
+const SidebarGroup: React.FC<{
+  parent: NavItem;
+  activeNav: string;
+  onSelect: (childId: string) => void;
+}> = ({ parent, activeNav, onSelect }) => {
+  const ParentIcon = parent.icon;
+  return (
+    <div className="sidebar-group">
+      <div className="sidebar-group-title">
+        <ParentIcon className="w-4 h-4" />
+        <span>{parent.label}</span>
+      </div>
+      <ul className="sidebar-group-items" role="menu">
+        {parent.children?.map((child) => {
+          const ChildIcon = child.icon;
+          const isActive = activeNav === child.id;
+          return (
+            <li key={child.id} role="none">
+              <button
+                role="menuitem"
+                onClick={() => onSelect(child.id)}
+                className={`sidebar-item ${isActive ? 'active' : ''}`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <ChildIcon className="w-4 h-4 shrink-0" />
+                <span className="sidebar-item-label">{child.label}</span>
+                {isActive && <span className="sidebar-item-dot" aria-hidden="true" />}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+};
+
 export default function App() {
   const [token, setToken] = useState<string>('');
   const [user, setUser] = useState<any>(null);
@@ -149,6 +189,8 @@ export default function App() {
   // o hijo directo 'apertura'/'areas-diagnostico'/etc.)
   const [activeNav, setActiveNav] = useState<string>('apertura');
   const [expandedParent, setExpandedParent] = useState<string | null>('taller');
+  // Sidebar móvil: drawer colapsable
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Permisos efectivos del rol activo (moduleId → actions[])
   const [rolePerms, setRolePerms] = useState<RolePermissionsMap | null>(null);
@@ -354,57 +396,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Barra de Navegación Jerárquica: Padres + Submenús */}
-        <div className="tabs">
-          <div className="tabs-in">
-            {visibleNavItems.map((parent) => {
-              const ParentIcon = parent.icon;
-              const isExpanded = expandedParent === parent.id;
-              const hasActiveChild = parent.children?.some((c) => c.id === activeNav);
-
-              return (
-                <div key={parent.id} className="nav-group">
-                  <button
-                    onClick={() => setExpandedParent(isExpanded ? null : parent.id)}
-                    className={`tab ${hasActiveChild ? 'active' : ''}`}
-                    aria-expanded={isExpanded}
-                    aria-haspopup="true"
-                  >
-                    <ParentIcon className={`w-4 h-4 ${hasActiveChild ? 'text-[var(--navy)]' : 'text-[var(--slate)]'}`} />
-                    {parent.label}
-                  </button>
-
-                  {isExpanded && parent.children && (
-                    <div className="nav-submenu" role="menu" aria-label={`${parent.label} submenú`}>
-                      <div className="nav-submenu-header">
-                        {parent.label}
-                      </div>
-                      {parent.children.map((child) => {
-                        const ChildIcon = child.icon;
-                        const isChildActive = activeNav === child.id;
-                        return (
-                          <button
-                            key={child.id}
-                            role="menuitem"
-                            onClick={() => {
-                              setExpandedParent(parent.id);
-                              setActiveNav(child.id);
-                            }}
-                            className={`tab sub ${isChildActive ? 'active' : ''}`}
-                            aria-selected={isChildActive}
-                          >
-                            <ChildIcon className={`w-3.5 h-3.5 ${isChildActive ? 'text-[var(--lime)]' : 'text-[var(--slate)]'}`} />
-                            {child.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </header>
 
       {/* Simulador y Selector Rápido de Roles para Pruebas */}
@@ -415,42 +406,79 @@ export default function App() {
         loading={loading}
       />
 
-      {/* Contenido Principal */}
-      <main className="flex-1 w-full max-w-[1440px] mx-auto p-4 sm:p-6">
-        {(() => {
-          // Buscar el item activo recorriendo visibleNavItems (filtrado por RBAC)
-          let activeModule: ModuleId | undefined;
-          let tallerTab: TallerSubNav | undefined;
-          for (const parent of visibleNavItems) {
-            const leaf = parent.children?.find((c) => c.id === activeNav);
-            if (leaf) {
-              activeModule = leaf.module;
-              if (activeModule === 'taller') {
-                tallerTab = SUBNAV_TO_TALLER_TAB[leaf.id];
-              }
-              break;
-            }
-          }
-
-          if (activeModule === 'taller') {
-            return (
-              <TallerModule
-                token={token}
-                activeCompany={activeCompany}
-                currentUser={user}
-                rolePerms={rolePerms || {}}
-                initialTab={tallerTab}
+      {/* Sidebar lateral persistente + área de contenido */}
+      <div className="app-shell">
+        {/* Sidebar con todas las opciones de navegación */}
+        <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} aria-label="Navegación principal">
+          <nav className="sidebar-nav">
+            {visibleNavItems.map((parent) => (
+              <SidebarGroup
+                key={parent.id}
+                parent={parent}
+                activeNav={activeNav}
+                onSelect={(childId) => {
+                  setActiveNav(childId);
+                  setSidebarOpen(false);
+                }}
               />
-            );
-          }
-          if (activeModule === 'users') return <UserManagementModule token={token} currentUser={user} />;
-          if (activeModule === 'swagger') return <SwaggerModule />;
-          if (activeModule === 'notifications') return <NotificationsModule />;
-          if (activeModule === 'multimedia') return <MultimediaModule />;
-          if (activeModule === 'query_runner') return <TestConsoleModule />;
-          return null;
-        })()}
-      </main>
+            ))}
+          </nav>
+          <div className="sidebar-footer">
+            <span className="text-[10px] text-[var(--slate)] font-mono">v1.0 · San Luis</span>
+          </div>
+        </aside>
+
+        {/* Contenido Principal */}
+        <main className="flex-1 w-full p-4 sm:p-6 min-w-0">
+          {(() => {
+            // Buscar el item activo recorriendo visibleNavItems (filtrado por RBAC)
+            let activeModule: ModuleId | undefined;
+            let tallerTab: TallerSubNav | undefined;
+            for (const parent of visibleNavItems) {
+              const leaf = parent.children?.find((c) => c.id === activeNav);
+              if (leaf) {
+                activeModule = leaf.module;
+                if (activeModule === 'taller') {
+                  tallerTab = SUBNAV_TO_TALLER_TAB[leaf.id];
+                }
+                break;
+              }
+            }
+
+            if (activeModule === 'taller') {
+              return (
+                <TallerModule
+                  token={token}
+                  activeCompany={activeCompany}
+                  currentUser={user}
+                  rolePerms={rolePerms || {}}
+                  initialTab={tallerTab}
+                />
+              );
+            }
+            if (activeModule === 'users') return <UserManagementModule token={token} currentUser={user} />;
+            if (activeModule === 'swagger') return <SwaggerModule />;
+            if (activeModule === 'notifications') return <NotificationsModule />;
+            if (activeModule === 'multimedia') return <MultimediaModule />;
+            if (activeModule === 'query_runner') return <TestConsoleModule />;
+            return null;
+          })()}
+        </main>
+
+        {/* Overlay en móvil al abrir el sidebar */}
+        {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+
+        {/* Botón hamburguesa flotante (solo móvil) */}
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={() => setSidebarOpen((s) => !s)}
+          aria-label="Alternar menú lateral"
+          title="Menú"
+        >
+          ☰
+        </button>
+      </div>
 
       {/* Footer */}
       <footer className="bg-white border-t border-[var(--line)] text-[var(--slate)] text-xs py-4">

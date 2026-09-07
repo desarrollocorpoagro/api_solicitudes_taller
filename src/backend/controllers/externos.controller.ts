@@ -25,6 +25,7 @@ export class ExternosController {
 
       const solicitud = await SolicitudExterno.create({
         ordenId,
+        placa: String(orden.placa).trim().toUpperCase(),
         otId,
         proveedor,
         descripcion,

@@ -107,7 +107,8 @@ export class AuditService {
 
       return auditRecord;
     } catch (err: any) {
-      logger.error(`[AuditService] Error registrando auditoría en orden ${input.ordenId}: ${err.message}`);
+      const detail = err?.parent?.message || err?.original?.message || err?.message || String(err);
+      logger.error(`[AuditService] Error registrando auditoría en orden ${input.ordenId}: ${detail}`);
       return null;
     }
   }

@@ -41,7 +41,7 @@ const ALL_ROLES = [
 ];
 
 const MODULE_DEFINITIONS = [
-  { id: 'taller', name: 'Órdenes de Taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'admin'] },
+  { id: 'taller', name: 'Órdenes de Taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'view_costs', 'admin'] },
   { id: 'fleet', name: 'Flota Vehicular', actions: ['read', 'create', 'update', 'delete', 'admin'] },
   { id: 'almacen', name: 'Almacén & Repuestos', actions: ['read', 'create', 'update', 'delete', 'dispatch', 'admin'] },
   { id: 'aprobaciones', name: 'Aprobaciones & Gastos', actions: ['read', 'approve', 'reject', 'admin'] },
@@ -981,7 +981,7 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
                                   }}
                                 >
                                   {isChecked && <Check className="w-3 h-3 text-[var(--lime)] inline mr-1" />}
-                                  {act}
+                                  {act === 'view_costs' ? 'Ver tarifas y costos' : act}
                                 </button>
                               );
                             })}

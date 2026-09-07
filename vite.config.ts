@@ -19,8 +19,13 @@ export default defineConfig(() => {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // SQLite actualiza estos archivos al guardar datos. No deben provocar
+      // HMR ni recargas completas de la SPA.
+      watch: process.env.DISABLE_HMR === 'true'
+        ? null
+        : {
+            ignored: ['**/data/**', '**/*.sqlite', '**/*.sqlite-*'],
+          },
       proxy: {
         '/api': {
           target: `http://localhost:${Number(process.env.PORT) || 4000}`,

@@ -11,6 +11,7 @@ Documentación técnica y descriptiva de los endpoints disponibles en la API del
 4. [Maestro de Flota Vehicular y QR](#4-maestro-de-flota-vehicular-y-qr)
 5. [Catálogo de Repuestos y Sincronización ERP](#5-catálogo-de-repuestos-y-sincronización-erp)
 6. [Órdenes de Servicio (Taller San Luis)](#6-órdenes-de-servicio-taller-san-luis)
+6.5. [Flujo Unificado de Gastos (AREA · REPUESTO · EXTERNO)](#65-flujo-unificado-de-gastos-area--repuesto--externo)
 7. [Órdenes de Área (OT / Diagnóstico / Mano de Obra)](#7-órdenes-de-área-ot--diagnóstico--mano-de-obra)
 8. [Solicitudes de Repuestos](#8-solicitudes-de-repuestos)
 9. [Solicitudes de Servicios Externos y Garantías](#9-solicitudes-de-servicios-externos-y-garantías)
@@ -20,6 +21,104 @@ Documentación técnica y descriptiva de los endpoints disponibles en la API del
 13. [Almacenamiento Multimedia en la Nube](#13-almacenamiento-multimedia-en-la-nube)
 14. [Motor Multiagente de Inteligencia Artificial](#14-motor-multiagente-de-inteligencia-artificial)
 15. [Monitoreo y Diagnóstico del Sistema](#15-monitoreo-y-diagnóstico-del-sistema)
+16. [Conexión Adicional MSSQL Profit Plus (`AD_TRANS`)](#16-conexión-adicional-mssql-profit-plus-ad_trans)
+
+---
+
+## 6.5. Flujo Unificado de Gastos (AREA · REPUESTO · EXTERNO)
+
+Captura local + sincronización idempotente a **`dbo.gastos`** de Profit Plus MSSQL. Los tres orígenes posibles son:
+
+| Origen   | Trigger                                                            | Campo `tipo_origen` |
+| -------- | ------------------------------------------------------------------ | ------------------- |
+| AREA     | `OrdenArea` con `horas > 0`                                        | `AREA`              |
+| REPUESTO | `SolicitudRepuesto` (crear / aprobar / despachar)                  | `REPUESTO`          |
+| EXTERNO  | `SolicitudExterno` con `estadoAprobacion = 'Aprobada'`             | `EXTERNO`           |
+
+Cada fila se identifica por la columna **`idempotency_key = "${tipo_origen}:${id_origen_referencia}"`** y mantiene el estado de sincronización:
+
+| `estado_sincronizacion` | Significado                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `PENDIENTE`             | Aún no enviado a MSSQL                                                         |
+| `ENVIADO`               | Confirmado en `dbo.gastos` (con `mssqlSyncedAt`)                               |
+| `ERROR`                 | Último intento falló (mensaje en `mssqlError`; se reintenta en el próximo ciclo) |
+
+### `GET /api/v1/gastos`
+- **Descripción**: Lista gastos locales con filtros opcionales `estado`, `tipo_origen`, `ordenId`, `id_origen_referencia`, `synced` (alias retrocompatible), `limit` (default 100, max 500).
+
+### `POST /api/v1/gastos`
+- **Descripción**: Crea/actualiza un gasto local manualmente con validación previa. Si se pasa `tipo_origen` + `id_origen_referencia`, delega a la función tipada `ensureLocalGastoFor{Area,Repuesto,Externo}` para mantener las reglas de negocio. Dispara sincronización por evento (no bloquea la respuesta).
+- **Cuerpo de la Solicitud (JSON)**:
+  ```json
+  {
+    "tipo_origen": "REPUESTO",
+    "id_origen_referencia": "sol-2026-0042",
+    "ordenId": "OS-2026-00123",
+    "monto": 145.5,
+    "nota": "Cambio de filtro de aceite"
+  }
+  ```
+- **Respuesta `400`** (validación): `{ success: false, error: 'Validación fallida', details: [...] }`
+- **Respuesta `409`** (orden cerrada o id_origen no resuelto): `{ success: false, error: 'La orden está cerrada...' }`
+
+### `POST /api/v1/gastos/sync`
+- **Descripción**: Empuja los gastos `PENDIENTE` (y opcionalmente `ERROR`) hacia `dbo.gastos` en MSSQL. Realiza introspección de columnas reales antes del UPSERT, usa `MERGE` (MSSQL) o `ON CONFLICT` (SQLite) y reintenta con backoff exponencial los errores transitorios.
+- **Query Params**:
+  - `limit` (opcional, default 200)
+  - `incluirErroneos=true` para reintentar también las filas en estado `ERROR`
+- **Respuesta Exitosa (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "attempted": 2,
+    "inserted": 2,
+    "updated": 0,
+    "failed": 0,
+    "errors": [],
+    "durationMs": 1866
+  }
+  ```
+
+### `POST /api/v1/gastos/sync/:id`
+- **Descripción**: Sincroniza **un único** gasto (por evento). Útil para invocar tras crear/actualizar manualmente una fila desde el frontend. Devuelve el mismo `SyncReport` con 1 elemento.
+
+### `POST /api/v1/gastos/backfill`
+- **Descripción**: Recorre todas las `SolicitudRepuesto`, `SolicitudExterno` y `OrdenArea` de órdenes **abiertas** y garantiza un Gasto local por cada una. Idempotente: no duplica filas, sólo actualiza montos cuando cambian. Útil tras restaurar copias de seguridad o migrar datos.
+- **Respuesta Exitosa (200 OK)**:
+  ```json
+  { "success": true, "processed": 6, "created": 0, "updated": 2, "skipped": 4 }
+  ```
+
+### `POST /api/v1/gastos/regenerate/:solicitudId`
+- **Descripción**: Regenera el gasto local de una `SolicitudRepuesto` específica (compatibilidad retrocompatible). Dispara sync por evento.
+
+### `POST /api/v1/gastos/regenerate-ref/:id`
+- **Descripción**: Variante polimórfica — recibe `id` y opcional `?tipo=AREA|REPUESTO|EXTERNO`. Si se omite `tipo`, prueba las tres tablas en orden hasta encontrar el origen.
+
+### `GET /api/v1/gastos/stats`
+- **Descripción**: Diagnóstico de la tabla `gastos` local. Devuelve conteos por estado (`pendiente`, `enviado`, `error`, `total`), conteo de órdenes abiertas y totales monetarios por `tipo_origen`.
+- **Respuesta Exitosa (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "total": 6,
+      "pendiente": 0,
+      "enviado": 6,
+      "error": 0,
+      "ordenesAbiertas": 7,
+      "porTipo": [
+        { "tipo_origen": "REPUESTO", "n": 3, "total": 245.50 },
+        { "tipo_origen": "AREA",     "n": 2, "total": 120.00 },
+        { "tipo_origen": "EXTERNO",  "n": 1, "total":  80.00 }
+      ]
+    }
+  }
+  ```
+
+### Sincronización automática de fondo
+
+El servidor arranca un **sincronizador periódico cada 60s** que invoca `syncGastosToMssql({ incluirErroneos: false })` desde `server.ts` → `startBackgroundGastosSync(60000)`. Los hooks transaccionales de Sequelize (`afterCreate`/`afterUpdate` de `SolicitudRepuesto`, `SolicitudExterno` y `OrdenArea`) también disparan el upsert local al momento del cambio; la sincronización remota queda en manos del ciclo.
 
 ---
 
