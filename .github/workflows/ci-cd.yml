@@ -16,17 +16,20 @@ jobs:
       - name: Checkout Código Fuente
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js 20
+      # Node 24: el puente SQLite local (sqliteBridge.cjs) usa node:sqlite,
+      # que es estable únicamente en Node >= 24. Node 20 lo rompería.
+      - name: Configurar Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 24
 
-      - name: Instalar Dependencias
-        run: npm ci
+      # El repo usa bun.lock (no package-lock.json), por eso instalamos con Bun
+      # en lugar de `npm ci`, que falla al no encontrar lockfile npm.
+      - name: Configurar Bun (gestor de paquetes)
+        uses: oven-sh/setup-bun@v2
 
-      - name: Liberar puertos por defecto (noop en CI)
-        run: echo "CI runners: ports 4000/4100 están libres"
+      - name: Instalar Dependencias con Bun
+        run: bun install --frozen-lockfile
 
       - name: Verificación de Tipos TypeScript
         run: npm run lint
@@ -41,14 +44,16 @@ jobs:
       - name: Checkout Código
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js 20
+      - name: Configurar Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 24
 
-      - name: Instalar Dependencias
-        run: npm ci
+      - name: Configurar Bun (gestor de paquetes)
+        uses: oven-sh/setup-bun@v2
+
+      - name: Instalar Dependencias con Bun
+        run: bun install --frozen-lockfile
 
       - name: Ejecutar Suite de Pruebas Unitarias
         run: npm run test
@@ -57,6 +62,9 @@ jobs:
           PORT: 4000
           FRONTEND_PORT: 4100
           DB_DIALECT: sqlite
+          # Evita intentar conectar a SRVBDPROFITBK desde CI (no hay red);
+          # opera directamente contra el espejo SQLite de Profit versionado.
+          PROFIT_DB_DIALECT: sqlite
           JWT_SECRET: ci-cd-test-secret-key-2026
 
   # 3. Compilación y Construcción de Artefactos
@@ -69,14 +77,16 @@ jobs:
       - name: Checkout Código
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js 20
+      - name: Configurar Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 24
 
-      - name: Instalar Dependencias
-        run: npm ci
+      - name: Configurar Bun (gestor de paquetes)
+        uses: oven-sh/setup-bun@v2
+
+      - name: Instalar Dependencias con Bun
+        run: bun install --frozen-lockfile
 
       - name: Compilar Frontend & Backend Bundle
         run: npm run build

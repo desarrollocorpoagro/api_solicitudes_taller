@@ -89,6 +89,19 @@ export async function runAllUnitTests(): Promise<{ total: number; passed: number
 
   // SUITE 3: Catálogo y Tarifas de Mano de Obra
   await runTest('Catálogo de Repuestos', 'Debe verificar existencias y costos de repuestos de frenos', async () => {
+    // Test autocontenido: en producción el catálogo lo puebla MasterSyncService
+    // desde MSSQL, pero en CI no hay sincronización. Se asegura un artículo demo.
+    await CatalogoRepuesto.findOrCreate({
+      where: { cod: 'FRE-0234' },
+      defaults: {
+        desc: 'Discos de freno delanteros ventilados (demo CI)',
+        stock: 8,
+        costo: 38.5,
+        almacen: 'TLL-01',
+        categoria: 'Frenos y Suspensión',
+      },
+    });
+
     const disco = await CatalogoRepuesto.findOne({ where: { cod: 'FRE-0234' } });
     if (!disco || Number(disco.costo) <= 0 || disco.stock <= 0) {
       throw new Error('Artículo FRE-0234 no tiene costo o stock válido');
@@ -375,10 +388,22 @@ export async function runAllUnitTests(): Promise<{ total: number; passed: number
   await runTest('Persistencia Dual (Local + MSSQL)', 'Al aperturar orden de servicio debe guardarse tanto en BD Local como en MSSQL AD_TRANS (flota_ordenes_servicio)', async () => {
     const { OrdenController } = await import('../controllers/orden.controller');
     const { OrdenServicio, FlotaOrdenServicioProfit } = await import('../models');
+    const { profitMirrorSequelize } = await import('../config/profitDb');
+
+    // Test autocontenido: el espejo versionado no garantiza una unidad
+    // perteneciente al tenant seed. Se siembra una unidad demo propia de la
+    // empresa ACTIVA del seed para sortear el aislamiento multi-tenant.
+    const empresaActiva = 'TRANSPORTE SAN LUIS DE LARA, C.A.';
+    const placaDemo = 'TEST-2601';
+    await profitMirrorSequelize.query(
+      `INSERT OR IGNORE INTO flota_vehiculos (codigo, Placa, Empresa_Propietaria, Marca, km_actual, activo)
+       VALUES ('TEST-2601', 'TEST-2601', ?, 'Mercedes-Benz', 50000, 1)`,
+      { replacements: [empresaActiva] }
+    );
 
     const req: any = {
       body: {
-        placa: 'A12BC3D',
+        placa: placaDemo,
         km: 195000,
         recibidoPor: 'V11587399',
         entregadoPor: 'Carlos Eduardo Mendoza Silva',
