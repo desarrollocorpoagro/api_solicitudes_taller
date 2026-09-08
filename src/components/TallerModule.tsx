@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { OrdenAuditHistory } from './OrdenAuditHistory';
 import SanLuisLogo from './SanLuisLogo';
+import OrdenPicker from './OrdenPicker';
 
 type TallerTabId = 'apertura' | 'areas' | 'repuestos' | 'externos' | 'aprob' | 'almacen' | 'cierre' | 'auditoria';
 
@@ -1002,10 +1003,9 @@ export const TallerModule: React.FC<{
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>Órdenes de {activeCompany?.code || 'Empresa'}:</label>
-            <select
+            <OrdenPicker
               value={ordNo}
-              onChange={(e) => {
-                const selected = e.target.value;
+              onChange={(selected) => {
                 setOrdNo(selected);
                 if (selected.includes('NUEVA')) {
                   setEstadoOrden('Abierta');
@@ -1017,17 +1017,11 @@ export const TallerModule: React.FC<{
                   setDiagnosticoInicial('');
                 }
               }}
-              style={{ padding: '6px 12px', fontSize: 13, minWidth: 160 }}
-            >
-              {companyOrders
-                .filter((o) => o.estado !== 'Cerrada')
-                .map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.id} - {o.placa} ({o.estado})
-                  </option>
-                ))}
-              <option value={`OS-${new Date().getFullYear()}-NUEVA`}>➕ Aperturar Nueva Orden</option>
-            </select>
+              orders={companyOrders.filter((o) => o.estado !== 'Cerrada')}
+              allowNueva
+              placeholder="Buscar por placa o nº de orden…"
+              onFeedback={(msg, ok) => showToast(msg, ok ? 'ok' : 'err')}
+            />
             <button
               onClick={() => {
                 setOrdNo(`OS-${new Date().getFullYear()}-NUEVA`);

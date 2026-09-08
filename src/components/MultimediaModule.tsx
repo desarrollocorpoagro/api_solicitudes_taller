@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Image, Upload, Trash2, FileText, CheckCircle, ExternalLink, Download, Copy, Shield, Sparkles } from 'lucide-react';
 import SanLuisLogo from './SanLuisLogo';
+import OrdenPicker from './OrdenPicker';
 
 export const MultimediaModule: React.FC = () => {
   const [files, setFiles] = useState<any[]>([]);
@@ -9,10 +10,28 @@ export const MultimediaModule: React.FC = () => {
   const [ordenId, setOrdenId] = useState('OS-2026-00101');
   const [tipo, setTipo] = useState('foto_sintoma');
   const [toast, setToast] = useState<string | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
 
   useEffect(() => {
     fetchFiles();
   }, [ordenId]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = localStorage.getItem('sanluis_token');
+        const res = await fetch('/api/v1/ordenes', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) return;
+        const data = await res.json();
+        if (data.success) setOrders(data.data || []);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, []);
 
   const fetchFiles = async () => {
     setLoading(true);
@@ -93,10 +112,12 @@ export const MultimediaModule: React.FC = () => {
         <form onSubmit={handleUpload} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end text-xs">
           <div>
             <label className="block uppercase font-semibold text-slate-600 mb-1">Orden de Servicio *</label>
-            <input
+            <OrdenPicker
               value={ordenId}
-              onChange={(e) => setOrdenId(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              onChange={setOrdenId}
+              orders={orders}
+              placeholder="Buscar por placa o nº de orden…"
+              onFeedback={(msg) => setToast(msg)}
             />
           </div>
 
