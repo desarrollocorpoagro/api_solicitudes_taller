@@ -4,9 +4,63 @@ import { EmailService } from '../services/email.service';
 import { AuditService } from '../services/audit.service';
 import { ErpService } from '../services/erp.service';
 import { logger } from '../utils/logger';
+import { profitMirrorSequelize } from '../config/profitDb';
 import { whereTrimCod } from '../utils/trimWhere';
 
 export class RepuestosController {
+  /**
+   * Resuelve un artículo desde el catálogo espejo de Profit (vw_flota_articulos),
+   * la misma fuente que alimenta la UI (GET /api/v1/catalogo). Si un código válido
+   * aún no se sincronizó a CatalogoRepuesto, lo registra automáticamente
+   * (self-healing) y devuelve el registro local con los datos de costo/stock.
+   */
+  private static async resolveArticuloDesdeMirror(cod: string): Promise<CatalogoRepuesto | null> {
+    const [rows]: any = await profitMirrorSequelize.query(
+      `SELECT TRIM(codigo_profit) AS cod, TRIM(nombre_producto) AS descr,
+              costo, codigo_subalmacen, sub_almacen, almacen, categoria, stock_act
+       FROM vw_flota_articulos
+       WHERE LTRIM(RTRIM(codigo_profit)) = LTRIM(RTRIM(?))`,
+      { replacements: [cod] }
+    );
+    const filas: any[] = rows ?? [];
+    if (!filas.length) return null;
+
+    // Agrupar por subalmacén igual que CatalogoController.getCatalogo:
+    // stock solo suma el subalmacén '01'; el '00' es stock central.
+    let stock = 0;
+    let tieneSubCentral = false;
+    for (const row of filas) {
+      const sub = String(row.codigo_subalmacen ?? '').trim();
+      if (sub === '00' || sub === '0') {
+        tieneSubCentral = true;
+      } else {
+        stock += Number(row.stock_act ?? 0);
+      }
+    }
+
+    const codLimpio = String(rows[0].cod ?? '').trim();
+    const primerFila = filas[0];
+    const [articulo, created] = await CatalogoRepuesto.findOrCreate({
+      where: { cod: codLimpio },
+      defaults: {
+        cod: codLimpio,
+        desc: String(primerFila.descr ?? '').trim(),
+        categoria: primerFila.categoria || 'General',
+        stock,
+        costo: Number(primerFila.costo ?? 0),
+        almacen: tieneSubCentral && stock === 0 ? '00' : String(primerFila.almacen ?? primerFila.sub_almacen ?? 'ALM-01').trim(),
+      },
+    });
+    if (!created) {
+      articulo.stock = stock;
+      articulo.costo = Number(primerFila.costo ?? articulo.costo);
+      articulo.almacen = tieneSubCentral && stock === 0 ? '00' : articulo.almacen;
+      await articulo.save();
+    }
+
+    logger.info(`[RepuestosController] Artículo ${codLimpio} resuelto desde el espejo Profit (${created ? 'registrado' : 'actualizado'}) y vinculado al catálogo local.`);
+    return articulo;
+  }
   /**
    * Agrega una solicitud de repuesto para una orden de área específica.
    */
@@ -21,11 +75,17 @@ export class RepuestosController {
       const area = await OrdenArea.findOne({ where: { id: otId, ordenId } });
       if (!area) return res.status(404).json({ success: false, error: 'Orden de área no encontrada.' });
 
-      const articulo = await CatalogoRepuesto.findOne({
+      let articulo = await CatalogoRepuesto.findOne({
         where: whereTrimCod(cod),
       });
       if (!articulo) {
-        return res.status(404).json({ success: false, error: `Artículo no encontrado en el catálogo de repuestos: ${cod}` });
+        // El código puede ser válido en Profit pero aún no estar sincronizado al
+        // catálogo local (CatalogoRepuesto). Se resuelve desde la vista espejo
+        // vw_flota_articulos que alimenta la UI y se registra automáticamente.
+        articulo = await RepuestosController.resolveArticuloDesdeMirror(cod ?? '');
+        if (!articulo) {
+          return res.status(404).json({ success: false, error: `Artículo no encontrado en el catálogo de repuestos: ${cod}` });
+        }
       }
       if (articulo.almacen === '00') {
         return res.status(400).json({ success: false, error: 'El artículo tiene codigo_subalmacen=00, debe solicitar traslado al central.' });
