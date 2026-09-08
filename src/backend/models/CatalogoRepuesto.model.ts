@@ -8,6 +8,7 @@ export interface CatalogoRepuestoAttributes {
   stock: number;
   costo: number;
   almacen: string;
+  
   categoria?: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -22,6 +23,7 @@ export class CatalogoRepuesto extends Model<CatalogoRepuestoAttributes, Catalogo
   public stock!: number;
   public costo!: number;
   public almacen!: string;
+  
   public categoria!: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -62,6 +64,7 @@ CatalogoRepuesto.init(
       type: DataTypes.STRING(100),
       allowNull: true,
     },
+    
   },
   {
     sequelize,

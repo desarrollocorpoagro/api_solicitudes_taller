@@ -21,13 +21,17 @@ export class RepuestosController {
 
       const articulo = await CatalogoRepuesto.findOne({ where: { cod: cod.toUpperCase().trim() } });
       if (!articulo) {
-        return res.status(404).json({ success: false, error: 'Artículo no encontrado en el catálogo de repuestos.' });
+        console.log(articulo)
+        //return res.status(404).json({ success: false, error: 'Artículo no encontrado en el catálogo de repuestos.'+ cod.toUpperCase().trim()  });
       }
+      // if (articulo.codigo_subalmacen === '00') {
+      //   return res.status(400).json({ success: false, error: 'El artículo tiene codigo_subalmacen=00, debe solicitar traslado al central.' });
+      // }
 
       const cantidad = parseInt(cant, 10);
       const costoUnitario = parseFloat(Number(articulo.costo).toFixed(2));
       const costoTotal = parseFloat((cantidad * costoUnitario).toFixed(2));
-      const requiereEscalamiento = costoTotal > 500;
+      const requiereEscalamiento = costoTotal > 5000;
 
       const solicitud = await SolicitudRepuesto.create({
         ordenId,
@@ -42,7 +46,7 @@ export class RepuestosController {
         motivo: motivo || '',
         estadoAprobacion: 'Pendiente',
         estadoEntrega: 'Por entregar',
-        almacen: articulo.almacen || 'TLL-01',
+        almacen: articulo.almacen || '01',
         requiereEscalamiento,
       });
 

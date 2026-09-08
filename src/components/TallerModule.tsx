@@ -798,6 +798,7 @@ export const TallerModule: React.FC<{
       return;
     }
     try {
+      console.log('Enviando solicitud de repuesto:', { ...formRep, otId: targetOt });
       const res = await authFetch(`/api/v1/ordenes/${ordNo}/repuestos`, {
         method: 'POST',
         body: JSON.stringify({ ...formRep, otId: targetOt }),
