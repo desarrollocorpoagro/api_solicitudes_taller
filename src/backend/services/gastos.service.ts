@@ -546,6 +546,10 @@ async function ensureMssqlGastosTable(): Promise<void> {
     if (!hasOriginReference) {
       await profitSequelize.query(`ALTER TABLE [dbo].[gastos] ADD [id_origen_referencia] VARCHAR(50) NULL`);
     }
+    const hasPlaca = (columns ?? []).some((column: any) => column.name === 'placa');
+    if (!hasPlaca) {
+      await profitSequelize.query(`ALTER TABLE [dbo].[gastos] ADD [placa] VARCHAR(30) NULL`);
+    }
     mssqlTableEnsured = true;
     return;
   }
@@ -554,6 +558,7 @@ async function ensureMssqlGastosTable(): Promise<void> {
       id_ordenser           BIGINT NULL,
       idempotency_key       VARCHAR(120) NULL,
       id_origen_referencia  VARCHAR(50) NULL,
+      placa                 VARCHAR(30) NULL,
       codigo_articulo        VARCHAR(30) NULL,
       codigo_subalmacen      VARCHAR(30) NULL,
       co_cli                 VARCHAR(30) NULL,
@@ -599,6 +604,7 @@ async function upsertGastoToMssql(
     idempotency_key: gasto.idempotency_key ?? gasto.computeIdempotencyKey(),
     id_origen_referencia: gasto.id_origen_referencia ?? null,
     id_ordenser: gasto.id_ordenser ?? null,
+    placa: gasto.placa ?? null,
     codigo_articulo: gasto.codigo_articulo ?? null,
     codigo_subalmacen: gasto.codigo_subalmacen ?? null,
     co_cli: gasto.co_cli ?? null,

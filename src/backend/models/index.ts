@@ -443,7 +443,7 @@ export const seedInitialData = async () => {
     if (permCount === 0) {
       const defaultRolePerms = [
         // ADMIN (Acceso Total)
-        { role: 'ADMIN', module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'view_costs', 'admin'], description: 'Control total de órdenes de taller y costos de mano de obra' },
+        { role: 'ADMIN', module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'view_costs', 'close', 'admin'], description: 'Control total de órdenes de taller, costos de mano de obra y cierre de órdenes' },
         { role: 'ADMIN', module: 'fleet', actions: ['read', 'create', 'update', 'delete', 'admin'], description: 'Control total del maestro de flota' },
         { role: 'ADMIN', module: 'almacen', actions: ['read', 'create', 'update', 'delete', 'dispatch', 'admin'], description: 'Control total de almacén e inventario' },
         { role: 'ADMIN', module: 'aprobaciones', actions: ['read', 'approve', 'reject', 'admin'], description: 'Aprobación y autorización de órdenes y gastos' },
@@ -503,11 +503,16 @@ export const seedInitialData = async () => {
       logger.info(`[Seed] Matriz RBAC inicializada con ${defaultRolePerms.length} reglas de permisos por rol.`);
     }
 
-    // Evolución idempotente: el administrador conserva acceso a costos aunque
-    // la matriz RBAC ya existiera antes de agregar la acción específica.
+    // Evolución idempotente: el administrador conserva acceso a costos y a la
+    // acción cerrar, aunque la matriz RBAC ya existiera antes de agregar estas
+    // acciones específicas.
     const adminTallerPermission = await RolePermission.findOne({ where: { role: 'ADMIN', module: 'taller' } });
-    if (adminTallerPermission && !adminTallerPermission.actions.includes('view_costs')) {
-      adminTallerPermission.actions = [...adminTallerPermission.actions, 'view_costs'];
+    if (adminTallerPermission) {
+      for (const action of ['view_costs', 'close']) {
+        if (!adminTallerPermission.actions.includes(action)) {
+          adminTallerPermission.actions = [...adminTallerPermission.actions, action];
+        }
+      }
       await adminTallerPermission.save();
     }
 

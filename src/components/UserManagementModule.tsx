@@ -41,10 +41,10 @@ const ALL_ROLES = [
 ];
 
 const MODULE_DEFINITIONS = [
-  { id: 'taller', name: 'Órdenes de Taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'view_costs', 'admin'] },
+  { id: 'taller', name: 'Órdenes de Taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'view_costs', 'close', 'admin'] },
   { id: 'fleet', name: 'Flota Vehicular', actions: ['read', 'create', 'update', 'delete', 'admin'] },
   { id: 'almacen', name: 'Almacén & Repuestos', actions: ['read', 'create', 'update', 'delete', 'dispatch', 'admin'] },
-  { id: 'aprobaciones', name: 'Aprobaciones & Gastos', actions: ['read', 'approve', 'reject', 'admin'] },
+  { id: 'aprobaciones', name: 'Aprobaciones & Gastos', actions: ['read', 'approve', 'reject', 'view_costs', 'admin'] },
   { id: 'users', name: 'Usuarios & Empresas', actions: ['read', 'create', 'update', 'delete', 'admin'] },
   { id: 'permissions', name: 'Matriz de Permisos RBAC', actions: ['read', 'update', 'admin'] },
   { id: 'db_connections', name: 'Conexiones MSSQL / DB', actions: ['read', 'create', 'update', 'delete', 'test', 'admin'] },

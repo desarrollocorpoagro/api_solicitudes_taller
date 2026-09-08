@@ -7,8 +7,7 @@ export interface CatalogoRepuestoAttributes {
   desc: string;
   stock: number;
   costo: number;
-  almacen: string;
-  
+  almacen: string;  
   categoria?: string;
   createdAt?: Date;
   updatedAt?: Date;

@@ -413,15 +413,16 @@ export class SyncService {
     try {
       const articulosProfit = await VwFlotaArticulos.findAll({ limit: 100 });
       for (const art of articulosProfit) {
+        const cleanCod = String(art.codigo_profit ?? '').trim();
         const [repuesto, created] = await CatalogoRepuesto.findOrCreate({
-          where: { cod: art.codigo_profit },
+          where: { cod: cleanCod },
           defaults: {
-            cod: art.codigo_profit,
-            desc: art.nombre_producto,
+            cod: cleanCod,
+            desc: String(art.nombre_producto ?? '').trim(),
             categoria: art.categoria || 'General',
             stock: Math.floor(art.stock_act || 0),
             costo: art.costo || 0,
-            almacen: art.almacen || 'ALM-01',
+            almacen: String(art.almacen || 'ALM-01').trim(),
           },
         });
 

@@ -38,6 +38,15 @@ interface MecanicoProfitItem {
   activo: boolean;
 }
 
+const isAdminRole = (role?: string): boolean =>
+  ['ADMIN', 'ADMINISTRADOR'].includes(String(role || '').toUpperCase().trim());
+
+const fmtMonto = (value: any, visible: boolean): string => {
+  if (!visible) return '—';
+  const n = Number(value);
+  return Number.isFinite(n) ? `$${n.toFixed(2)}` : '—';
+};
+
 interface VendedorProfitItem {
   co_ven: string;
   cedula: string | null;
@@ -357,22 +366,24 @@ export const TallerModule: React.FC<{
  *  - repuestos:  solicitar repuestos a almacén (create).
  *  - externos:   solicitar servicios externos (create).
  *  - aprob:      aprobar/rechazar solicitudes (approve).
- *  - almacen:    confirmar despachos (dispatch).
- *  - cierre:     cerrar la orden y emitir liquidación (admin).
+*  - almacen:    confirmar despachos (dispatch).
+ *  - cierre:     cerrar la orden y emitir liquidación (close).
  *  - auditoria:  solo lectura — basta con `read`.
  *
- * Los roles que solo tienen `read` en `taller` (ALMACENISTA, OPERADOR, AUDITOR)
- * no podrán abrir ninguna pestaña operativa, pero sí verán "auditoría" porque
- * es de solo lectura. ADMIN (acciones con `admin`) satisface cualquier requisito.
+ *  Aprobaciones (aprob) muestra montos de costos: queda restringida a quienes
+ *  tengan `view_costs` (o ADMIN). Los roles que solo tienen `read` en `taller`
+ *  (ALMACENISTA, OPERADOR, AUDITOR) no podrán abrir ninguna pestaña operativa,
+ *  pero sí verán "auditoría" porque es de solo lectura. ADMIN (acciones con
+ *  `admin`) satisface cualquier requisito.
  */
   const TALLER_TAB_WRITE: Record<TallerTabId, string[]> = {
     apertura: ['create', 'admin'],
     areas: ['update', 'admin'],
     repuestos: ['create', 'admin'],
     externos: ['create', 'admin'],
-    aprob: ['approve', 'admin'],
+    aprob: ['view_costs', 'admin'],
     almacen: ['dispatch', 'admin'],
-    cierre: ['admin'],
+    cierre: ['close', 'admin'],
     auditoria: ['read', 'admin'],
   };
 
@@ -384,13 +395,13 @@ export const TallerModule: React.FC<{
     // Rol sin permisos cargados → denegar.
     if (perms.length === 0) return false;
     // ADMIN u override con acción `admin` → acceso total.
-    if (perms.includes('admin')) return true;
+    if (perms.includes('admin') || isAdminRole(currentUser?.role)) return true;
     // Cualquier otra acción califica para la pestaña correspondiente.
     return TALLER_TAB_WRITE[tabId].some((a) => perms.includes(a));
   };
 
   const canViewLaborCosts = Boolean(
-    currentUser?.role?.toUpperCase() === 'ADMIN' || rolePerms?.taller?.includes('view_costs')
+    isAdminRole(currentUser?.role) || rolePerms?.taller?.includes('view_costs')
   );
 
   // Si el menú superior pasa una `initialTab` y aún no estamos en ella, sincronizamos.
@@ -1829,7 +1840,7 @@ export const TallerModule: React.FC<{
                       </div>
                       <div>
                         <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Costo MO:</span>
-                        <div className="mono font-bold" style={{ marginTop: 8, color: 'var(--navy)' }}>${Number(ot.costoManoObra).toFixed(2)}</div>
+                        <div className="mono font-bold" style={{ marginTop: 8, color: 'var(--navy)' }}>{fmtMonto(ot.costoManoObra, true)}</div>
                       </div>
                     </>
                   )}
@@ -1927,7 +1938,7 @@ export const TallerModule: React.FC<{
                     <th>Repuesto</th>
                     <th>OT</th>
                     <th className="num">Cant</th>
-                    <th className="num">Total</th>
+                    {canViewLaborCosts && <th className="num">Total</th>}
                     <th>Aprobación</th>
                     <th>Entrega</th>
                   </tr>
@@ -1938,7 +1949,7 @@ export const TallerModule: React.FC<{
                       <td><b>{r.desc}</b> <span className="mono" style={{ color: 'var(--slate)' }}>({r.cod})</span></td>
                       <td className="mono">{r.otId}</td>
                       <td className="num mono">{r.cant}</td>
-                      <td className="num mono font-bold">${Number(r.costoTotal).toFixed(2)}</td>
+                      {canViewLaborCosts && <td className="num mono font-bold">{fmtMonto(r.costoTotal, true)}</td>}
                       <td>
                         <span className={`badge ${r.estadoAprobacion === 'Aprobada' ? 'b-ok' : r.estadoAprobacion === 'Rechazada' ? 'b-bad' : 'b-hi'}`}>
                           {r.estadoAprobacion}
@@ -2047,7 +2058,7 @@ export const TallerModule: React.FC<{
                     <th>Servicio</th>
                     <th>OT</th>
                     <th>Garantía</th>
-                    <th className="num">Costo</th>
+                    {canViewLaborCosts && <th className="num">Costo</th>}
                     <th>Aprobación</th>
                   </tr>
                 </thead>
@@ -2057,7 +2068,7 @@ export const TallerModule: React.FC<{
                       <td><b>{x.descripcion}</b> <span style={{ color: 'var(--slate)' }}>({x.proveedor})</span></td>
                       <td className="mono">{x.otId}</td>
                       <td>{x.conGarantia ? <span className="badge b-info">Garantía ({x.ordenOrigenGarantia})</span> : 'No'}</td>
-                      <td className="num mono font-bold">${Number(x.costoEfectivo).toFixed(2)}</td>
+                      {canViewLaborCosts && <td className="num mono font-bold">{fmtMonto(x.costoEfectivo, true)}</td>}
                       <td>
                         <span className={`badge ${x.estadoAprobacion === 'Aprobada' ? 'b-ok' : x.estadoAprobacion === 'Rechazada' ? 'b-bad' : 'b-hi'}`}>
                           {x.estadoAprobacion}
@@ -2077,12 +2088,12 @@ export const TallerModule: React.FC<{
         <div className="card">
           <h2>Bandeja del gerente de taller</h2>
           <div className="note n-info" style={{ marginBottom: 16 }}>
-            <b>Umbral de escalamiento configurado en $500,00.</b> Por encima de ese monto se requiere una segunda firma del responsable de flota.
+            <b>Aprobación automática activa.</b> Las solicitudes de repuestos y servicios externos se aprueban automáticamente al crearse. Umbral de escalamiento en $500,00: por encima se notifica al responsable de flota.
           </div>
 
           <div>
             {[...reps.map(r => ({ ...r, tipo: 'repuesto' as const, nombre: `${r.desc} × ${r.cant}`, monto: r.costoTotal })), ...exts.map(x => ({ ...x, tipo: 'externo' as const, nombre: `${x.descripcion} · ${x.proveedor}`, monto: x.costoEfectivo }))].length === 0 ? (
-              <div className="empty">No hay solicitudes que aprobar.</div>
+              <div className="empty">No hay solicitudes registradas.</div>
             ) : (
               [...reps.map(r => ({ ...r, tipo: 'repuesto' as const, nombre: `${r.desc} × ${r.cant}`, monto: r.costoTotal })), ...exts.map(x => ({ ...x, tipo: 'externo' as const, nombre: `${x.descripcion} · ${x.proveedor}`, monto: x.costoEfectivo }))].map((item) => {
                 const pend = item.estadoAprobacion === 'Pendiente';
@@ -2095,7 +2106,7 @@ export const TallerModule: React.FC<{
                         <div style={{ fontSize: 12, color: 'var(--slate)' }}>{item.otId} • {item.tipo === 'repuesto' ? 'Repuesto' : 'Servicio externo'}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div className="mono font-bold" style={{ fontSize: 16 }}>${Number(item.monto).toFixed(2)}</div>
+                        <div className="mono font-bold" style={{ fontSize: 16 }}>{fmtMonto(item.monto, canViewLaborCosts)}</div>
                         <span className={`badge ${item.estadoAprobacion === 'Aprobada' ? 'b-ok' : item.estadoAprobacion === 'Rechazada' ? 'b-bad' : 'b-hi'}`} style={{ marginTop: 4 }}>
                           {item.estadoAprobacion}
                         </span>

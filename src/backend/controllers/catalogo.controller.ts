@@ -3,6 +3,7 @@ import { CatalogoRepuesto } from '../models';
 import { ErpService } from '../services/erp.service';
 import { logger } from '../utils/logger';
 import { profitMirrorSequelize } from '../config/profitDb';
+import { whereTrimCod } from '../utils/trimWhere';
 
 export class CatalogoController {
   /**
@@ -68,7 +69,7 @@ export class CatalogoController {
     try {
       const { cod } = req.params;
       const repuesto = await CatalogoRepuesto.findOne({
-        where: { cod: cod.toUpperCase().trim() },
+        where: whereTrimCod(cod),
       });
 
       if (!repuesto) {
@@ -89,7 +90,7 @@ export class CatalogoController {
       const { cod } = req.params;
       const { stock, costo } = req.body;
 
-      const repuesto = await CatalogoRepuesto.findOne({ where: { cod: cod.toUpperCase().trim() } });
+      const repuesto = await CatalogoRepuesto.findOne({ where: whereTrimCod(cod) });
       if (!repuesto) return res.status(404).json({ success: false, error: 'Repuesto no encontrado.' });
 
       if (stock !== undefined) repuesto.stock = parseInt(stock, 10);

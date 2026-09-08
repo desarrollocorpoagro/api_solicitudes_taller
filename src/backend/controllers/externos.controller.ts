@@ -33,7 +33,9 @@ export class ExternosController {
         ordenOrigenGarantia: isGarantia ? ordenOrigenGarantia : undefined,
         costoCotizado: parseFloat(costoCotizado || '0'),
         costoEfectivo: costo,
-        estadoAprobacion: 'Pendiente',
+        estadoAprobacion: 'Aprobada',
+        aprobadoPor: (req as any).user?.email || 'Aprobación automática',
+        fechaAprobacion: new Date(),
         requiereEscalamiento,
       });
 
@@ -52,7 +54,7 @@ export class ExternosController {
         req,
       });
 
-      logger.info(`[ExternosController] Solicitud de servicio externo creada: ${descripcion} (${proveedor}) para ${ordenId}`);
+      logger.info(`[ExternosController] Solicitud de servicio externo creada y aprobada automáticamente: ${descripcion} (${proveedor}) para ${ordenId}`);
 
       return res.status(201).json({
         success: true,

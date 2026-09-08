@@ -4,6 +4,7 @@ import { SolicitudRepuesto, CatalogoRepuesto, OrdenServicio } from '../models';
 import { ErpService } from '../services/erp.service';
 import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
+import { whereTrimCod } from '../utils/trimWhere';
 import { getTenantContext, getAuthorizedPlatesForTenant } from '../utils/tenantHelper';
 
 export class AlmacenController {
@@ -73,7 +74,7 @@ export class AlmacenController {
       }
 
       // Actualizar existencias en catálogo
-      const articulo = await CatalogoRepuesto.findOne({ where: { cod: solicitud.cod } });
+      const articulo = await CatalogoRepuesto.findOne({ where: whereTrimCod(solicitud.cod) });
       if (articulo) {
         if (articulo.stock < solicitud.cant) {
           return res.status(400).json({

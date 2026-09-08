@@ -4,6 +4,7 @@ import { SolicitudRepuesto, SolicitudExterno, CatalogoRepuesto, OrdenServicio } 
 import { ErpService } from '../services/erp.service';
 import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
+import { whereTrimCod } from '../utils/trimWhere';
 import { getTenantContext, getAuthorizedPlatesForTenant } from '../utils/tenantHelper';
 
 export class AprobacionesController {
@@ -107,7 +108,7 @@ export class AprobacionesController {
           solicitud.fechaAprobacion = new Date();
 
           // Verificar stock actual en catálogo
-          const articulo = await CatalogoRepuesto.findOne({ where: { cod: solicitud.cod } });
+          const articulo = await CatalogoRepuesto.findOne({ where: whereTrimCod(solicitud.cod) });
           const stockDisponible = articulo ? articulo.stock : 0;
           solicitud.stockActual = stockDisponible;
 
