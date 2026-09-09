@@ -46,6 +46,7 @@ export interface GastoAttributes {
   ordenId?: string | null;
   solicitudId?: string | null;
   id_ordenser?: number | null;
+  nro_orden?: string | null;
   placa?: string | null;
   estado_sincronizacion?: GastoSyncStatus;
   syncedToMssql?: boolean;
@@ -80,6 +81,7 @@ export interface GastoCreationAttributes
     | 'ordenId'
     | 'solicitudId'
     | 'id_ordenser'
+    | 'nro_orden'
     | 'placa'
     | 'estado_sincronizacion'
     | 'syncedToMssql'
@@ -113,6 +115,7 @@ export class Gasto
   public ordenId!: string | null;
   public solicitudId!: string | null;
   public id_ordenser!: number | null;
+  public nro_orden!: string | null;
   public placa!: string | null;
   public estado_sincronizacion!: GastoSyncStatus;
   public syncedToMssql!: boolean;
@@ -234,6 +237,10 @@ export function initGastoModel(seq: Sequelize) {
       },
       id_ordenser: {
         type: DataTypes.BIGINT,
+        allowNull: true,
+      },
+      nro_orden: {
+        type: DataTypes.STRING(50),
         allowNull: true,
       },
       placa: {

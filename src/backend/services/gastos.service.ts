@@ -232,6 +232,7 @@ async function upsertGastoLocal(params: {
     existente.costo_total_calculado = params.monto;
     existente.monto = params.monto;
     existente.id_ordenser = idOrdenser;
+    existente.nro_orden = params.ordenId;
     existente.fecha_actividad = params.fecha_actividad ?? new Date();
     existente.placa = placa || existente.placa || '';
     existente.usuario = params.usuario ?? existente.usuario;
@@ -265,6 +266,7 @@ async function upsertGastoLocal(params: {
     nota: params.nota ?? '',
     fecha_create: new Date(),
     id_ordenser: idOrdenser,
+    nro_orden: params.ordenId,
     estado_sincronizacion: 'PENDIENTE',
     syncedToMssql: false,
     intentos_sincronizacion: 0,
@@ -434,6 +436,7 @@ export async function backfillGastoOrderIds(): Promise<number> {
     const idOrdenser = await resolveFlotaOrdenId(gasto.ordenId);
     if (idOrdenser === null) continue;
     gasto.id_ordenser = idOrdenser;
+    if (!gasto.nro_orden) gasto.nro_orden = gasto.ordenId;
     await gasto.save();
     updated++;
   }
@@ -526,6 +529,7 @@ async function ensureMssqlGastosTable(): Promise<void> {
   await profitSequelize.query(
     `CREATE TABLE dbo.gastos (
       id_ordenser           BIGINT NULL,
+      nro_orden             VARCHAR(50) NULL,
       idempotency_key       VARCHAR(120) NULL,
       id_origen_referencia  VARCHAR(50) NULL,
       placa                 VARCHAR(30) NULL,
@@ -574,6 +578,7 @@ async function upsertGastoToMssql(
     idempotency_key: gasto.idempotency_key ?? gasto.computeIdempotencyKey(),
     id_origen_referencia: gasto.id_origen_referencia ?? null,
     id_ordenser: gasto.id_ordenser ?? null,
+    nro_orden: gasto.nro_orden ?? gasto.ordenId ?? null,
     placa: gasto.placa ?? null,
     codigo_articulo: gasto.codigo_articulo ?? null,
     codigo_subalmacen: gasto.codigo_subalmacen ?? null,
@@ -765,6 +770,7 @@ export async function syncGastosToMssql(opts: {
     'idempotency_key',
     'id_origen_referencia',
     'id_ordenser',
+    'nro_orden',
     'codigo_articulo',
     'codigo_subalmacen',
     'co_cli',

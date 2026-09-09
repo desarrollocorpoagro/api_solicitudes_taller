@@ -277,6 +277,7 @@ async function ensureGastosTableAndBackfill() {
     await ensureColumn('estado_sincronizacion', `estado_sincronizacion VARCHAR(20) DEFAULT 'PENDIENTE'`);
     await ensureColumn('intentos_sincronizacion', `intentos_sincronizacion INTEGER DEFAULT 0`);
     await ensureColumn('id_ordenser', `id_ordenser BIGINT NULL`);
+    await ensureColumn('nro_orden', `nro_orden VARCHAR(50)`);
 
     // Backfill: poblar idempotency_key y tipo_origen para filas existentes
     // que aún no los tengan (preserva registros creados con la versión previa).
