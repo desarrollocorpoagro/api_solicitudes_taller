@@ -451,17 +451,17 @@ async function seedProfitFallbackTables(seq: Sequelize): Promise<void> {
     //   await seq.query(
     //   //   `
     //   //   INSERT INTO vw_flota_articulos (codigo_profit, nombre_producto, codigo_categoria, categoria, unidad_medida, costo, tipo, codigo_subalmacen, sub_almacen, codigo_almacen, almacen, stock_act) VALUES
-    //   //   ('FRE-0234', 'Discos de freno delanteros ventilados', 'FRE', 'Frenos y Suspensión', 'PAR', 38.50, 'Repuesto', 'SUB-FRE', 'Frenos y Neumática', 'TLL-01', 'Taller Principal San Luis', 8),
-    //   //   ('PAS-0301', 'Juego de pastillas de freno cerámicas', 'FRE', 'Frenos y Suspensión', 'JGO', 48.90, 'Repuesto', 'SUB-FRE', 'Frenos y Neumática', 'TLL-01', 'Taller Principal San Luis', 11),
+    //   //   ('FRE-0234', 'Discos de freno delanteros ventilados', 'FRE', 'Frenos y Suspensión', 'PAR', 38.50, 'Repuesto', 'SUB-FRE', 'Frenos y Neumática', '01', 'Taller Principal San Luis', 8),
+    //   //   ('PAS-0301', 'Juego de pastillas de freno cerámicas', 'FRE', 'Frenos y Suspensión', 'JGO', 48.90, 'Repuesto', 'SUB-FRE', 'Frenos y Neumática', '01', 'Taller Principal San Luis', 11),
     //   //   ('FIL-0112', 'Filtro de aceite motor diésel pesado', 'FIL', 'Filtros y Mantenimiento', 'UND', 12.40, 'Consumible', 'SUB-FIL', 'Filtros y Lubricantes', 'ALM-01', 'Almacén Central', 25),
     //   //   ('FIL-0115', 'Filtro de combustible primario trampa de agua', 'FIL', 'Filtros y Mantenimiento', 'UND', 18.20, 'Consumible', 'SUB-FIL', 'Filtros y Lubricantes', 'ALM-01', 'Almacén Central', 14),
     //   //   ('LUB-15W40', 'Aceite de motor 15W40 CI-4 / E7 Tambor 208L', 'LUB', 'Lubricantes y Fluidos', 'LIT', 4.50, 'Consumible', 'SUB-LUB', 'Lubricantes y Químicos', 'ALM-01', 'Almacén Central', 420),
-    //   //   ('COR-0988', 'Correa serpentina alternador / bomba de agua', 'MOT', 'Motor y Transmisión', 'UND', 24.00, 'Repuesto', 'SUB-MOT', 'Repuestos de Motor', 'TLL-01', 'Taller Principal San Luis', 6),
-    //   //   ('BAT-1100', 'Batería 1100 Amp 12V servicio pesado 4D', 'ELE', 'Sistema Eléctrico', 'UND', 145.00, 'Repuesto', 'SUB-ELE', 'Baterías y Eléctrico', 'TLL-01', 'Taller Principal San Luis', 4),
+    //   //   ('COR-0988', 'Correa serpentina alternador / bomba de agua', 'MOT', 'Motor y Transmisión', 'UND', 24.00, 'Repuesto', 'SUB-MOT', 'Repuestos de Motor', '01', 'Taller Principal San Luis', 6),
+    //   //   ('BAT-1100', 'Batería 1100 Amp 12V servicio pesado 4D', 'ELE', 'Sistema Eléctrico', 'UND', 145.00, 'Repuesto', 'SUB-ELE', 'Baterías y Eléctrico', '01', 'Taller Principal San Luis', 4),
     //   //   ('AMOR-5541', 'Amortiguador de cabina neumático', 'SUS', 'Frenos y Suspensión', 'UND', 62.00, 'Repuesto', 'SUB-SUS', 'Suspensión y Chasis', 'ALM-01', 'Almacén Central', 0),
     //   //   ('NEU-29580', 'Neumático 295/80R22.5 dirección y tracción', 'CAU', 'Cauchos y Neumáticos', 'UND', 285.00, 'Repuesto', 'SUB-CAU', 'Cauchos y Rines', 'ALM-01', 'Almacén Central', 16),
-    //   //   ('VAL-4VIA', 'Válvula protectora de cuatro circuitos neumática', 'NEU', 'Frenos y Neumática', 'UND', 95.00, 'Repuesto', 'SUB-NEU', 'Frenos y Neumática', 'TLL-01', 'Taller Principal San Luis', 3),
-    //   //   ('VAL-RET', 'Válvula de retención de aire 1/2 pulgada', 'NEU', 'Frenos y Neumática', 'UND', 14.50, 'Repuesto', 'SUB-NEU', 'Frenos y Neumática', 'TLL-01', 'Taller Principal San Luis', 19),
+    //   //   ('VAL-4VIA', 'Válvula protectora de cuatro circuitos neumática', 'NEU', 'Frenos y Neumática', 'UND', 95.00, 'Repuesto', 'SUB-NEU', 'Frenos y Neumática', '01', 'Taller Principal San Luis', 3),
+    //   //   ('VAL-RET', 'Válvula de retención de aire 1/2 pulgada', 'NEU', 'Frenos y Neumática', 'UND', 14.50, 'Repuesto', 'SUB-NEU', 'Frenos y Neumática', '01', 'Taller Principal San Luis', 19),
     //   //   ('RET-CIG', 'Retén de cigüeñal trasero vitón alta temp', 'MOT', 'Motor y Transmisión', 'UND', 22.80, 'Repuesto', 'SUB-MOT', 'Repuestos de Motor', 'ALM-01', 'Almacén Central', 7);
     //   // `
     // );

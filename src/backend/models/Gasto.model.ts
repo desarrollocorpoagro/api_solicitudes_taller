@@ -3,9 +3,11 @@ import { Sequelize } from 'sequelize';
 
 /**
  * Origen de un gasto. Determina la semántica y los hooks que lo generan.
- *   - AREA         → Mano de obra de una OrdenArea (horas * tarifaHora)
  *   - REPUESTO     → SolicitudRepuesto aprobada (cantidad * costoUnitario)
  *   - EXTERNO      → SolicitudExterno aprobada (costoEfectivo)
+ *
+ * AREA se mantiene únicamente para leer filas legacy (OrdenArea dejó de
+ * generar gastos; ya no se crean gastos con tipo_origen='AREA').
  */
 export type GastoOrigen = 'AREA' | 'REPUESTO' | 'EXTERNO';
 
@@ -17,9 +19,9 @@ export type GastoSyncStatus = 'PENDIENTE' | 'ENVIADO' | 'ERROR';
 
 export interface GastoAttributes {
   id: number;
-  /** Tipo de origen: AREA | REPUESTO | EXTERNO */
+  /** Tipo de origen: REPUESTO | EXTERNO (AREA solo lectura legacy) */
   tipo_origen?: GastoOrigen | null;
-  /** UUID o id de la OrdenArea / SolicitudRepuesto / SolicitudExterno que originó este gasto */
+  /** UUID o id de la SolicitudRepuesto / SolicitudExterno que originó este gasto */
   id_origen_referencia?: string | null;
   /**
    * Clave natural única para idempotencia. Formato: `${tipo_origen}:${id_origen_referencia}`.

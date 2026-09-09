@@ -9,6 +9,7 @@ export interface CatalogoRepuestoAttributes {
   costo: number;
   almacen: string;  
   categoria?: string;
+  tipo:string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -22,8 +23,8 @@ export class CatalogoRepuesto extends Model<CatalogoRepuestoAttributes, Catalogo
   public stock!: number;
   public costo!: number;
   public almacen!: string;
-  
   public categoria!: string;
+  public tipo!: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -57,11 +58,15 @@ CatalogoRepuesto.init(
     almacen: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      defaultValue: 'TLL-01',
+      defaultValue: '01',
     },
     categoria: {
       type: DataTypes.STRING(100),
       allowNull: true,
+    },
+    tipo:{
+      type:DataTypes.STRING(5),
+      allowNull:true,
     },
     
   },

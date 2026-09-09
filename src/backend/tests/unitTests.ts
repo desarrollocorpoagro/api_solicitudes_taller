@@ -97,7 +97,7 @@ export async function runAllUnitTests(): Promise<{ total: number; passed: number
         desc: 'Discos de freno delanteros ventilados (demo CI)',
         stock: 8,
         costo: 38.5,
-        almacen: 'TLL-01',
+        almacen: '01',
         categoria: 'Frenos y Suspensión',
       },
     });

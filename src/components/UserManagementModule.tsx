@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from './Toast';
 import {
   Users,
   UserPlus,
@@ -52,7 +53,29 @@ const MODULE_DEFINITIONS = [
   { id: 'reports', name: 'Auditoría & Reportes', actions: ['read', 'export', 'admin'] },
 ];
 
+// Etiquetas legibles para cada acción de permiso.
+// `read` y `view_costs` son permisos de "VER"; el resto son permisos de "HACER".
+export const ACTION_LABELS: Record<string, string> = {
+  read: 'Ver datos',
+  create: 'Crear',
+  update: 'Actualizar',
+  delete: 'Eliminar',
+  approve: 'Aprobar',
+  reject: 'Rechazar',
+  close: 'Cerrar orden',
+  dispatch: 'Despachar',
+  view_costs: 'Ver costos y tarifas',
+  export: 'Exportar',
+  execute_query: 'Ejecutar SQL',
+  test: 'Probar conexión',
+  requisition: 'Requisición',
+  admin: 'Admin total',
+};
+
+const VIEW_ACTIONS = new Set<string>(['read', 'view_costs']);
+
 export const UserManagementModule: React.FC<{ token: string; currentUser?: any }> = ({ token, currentUser }) => {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'users' | 'connections' | 'permissions' | 'queries'>('users');
 
   // ================= USERS STATE =================
@@ -273,10 +296,10 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
         setEditingUser(null);
         fetchUsers();
       } else {
-        alert(data.error || 'Error al guardar usuario');
+        toast(data.error || 'Error al guardar usuario', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, 'error');
     }
   };
 
@@ -291,10 +314,10 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
       if (data.success) {
         fetchUsers();
       } else {
-        alert(data.error);
+        toast(data.error, 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, 'error');
     }
   };
 
@@ -384,10 +407,10 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
         setEditingConn(null);
         fetchConnections();
       } else {
-        alert(data.error || 'Error al guardar configuración de base de datos.');
+        toast(data.error || 'Error al guardar configuración de base de datos.', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, 'error');
     }
   };
 
@@ -419,10 +442,10 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
       if (data.success) {
         fetchConnections();
       } else {
-        alert(data.error);
+        toast(data.error, 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, 'error');
     }
   };
 
@@ -485,10 +508,10 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
         setPermSuccessMsg(`¡Permisos para el rol ${selectedRole} guardados exitosamente!`);
         setTimeout(() => setPermSuccessMsg(''), 4000);
       } else {
-        alert(data.error || 'Error al guardar matriz de permisos');
+        toast(data.error || 'Error al guardar matriz de permisos', 'error');
       }
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, 'error');
     } finally {
       setPermSaving(false);
     }
@@ -904,7 +927,7 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
               <div>
                 <h3 style={{ margin: 0, fontSize: 16 }}>Matriz de Permisos por Rol (Control de Acceso RBAC)</h3>
                 <p className="hint" style={{ marginTop: 4, marginBottom: 0 }}>
-                  Configure los módulos del sistema y acciones permitidas (Lectura, Creación, Actualización, Eliminación, Aprobación, Despacho, Admin) para cada rol.
+                  Por cada rol y módulo, seleccione qué acciones puede HACER (crear, actualizar, eliminar, aprobar, cerrar, despachar, admin) y qué puede VER (datos, costos). <code>close</code> y <code>view_costs</code> son permisos independientes.
                 </p>
               </div>
 
@@ -964,27 +987,44 @@ export const UserManagementModule: React.FC<{ token: string; currentUser?: any }
                           </span>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {m.actions.map((act) => {
-                              const isChecked = assignedActions.includes(act);
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {(() => {
+                              const ver = m.actions.filter((a) => VIEW_ACTIONS.has(a));
+                              const hacer = m.actions.filter((a) => !VIEW_ACTIONS.has(a));
+                              const renderActions = (acts: string[]) =>
+                                acts.map((act) => {
+                                  const isChecked = assignedActions.includes(act);
+                                  return (
+                                    <button
+                                      key={act}
+                                      type="button"
+                                      onClick={() => togglePermissionAction(m.id, act)}
+                                      className={`btn ${isChecked ? 'dark' : ''}`}
+                                      style={{
+                                        minHeight: 'auto',
+                                        padding: '4px 10px',
+                                        fontSize: 12,
+                                        textTransform: 'uppercase',
+                                      }}
+                                    >
+                                      {isChecked && <Check className="w-3 h-3 text-[var(--lime)] inline mr-1" />}
+                                      {ACTION_LABELS[act] || act}
+                                    </button>
+                                  );
+                                });
                               return (
-                                <button
-                                  key={act}
-                                  type="button"
-                                  onClick={() => togglePermissionAction(m.id, act)}
-                                  className={`btn ${isChecked ? 'dark' : ''}`}
-                                  style={{
-                                    minHeight: 'auto',
-                                    padding: '4px 10px',
-                                    fontSize: 12,
-                                    textTransform: 'uppercase',
-                                  }}
-                                >
-                                  {isChecked && <Check className="w-3 h-3 text-[var(--lime)] inline mr-1" />}
-                                  {act === 'view_costs' ? 'Ver tarifas y costos' : act}
-                                </button>
+                                <>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                    <span style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: 700, color: 'var(--slate)', width: 42 }}>Ver</span>
+                                    {ver.length ? renderActions(ver) : <span style={{ fontSize: 11, color: 'var(--slate)' }}>—</span>}
+                                  </div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                    <span style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: 700, color: 'var(--slate)', width: 42 }}>Hacer</span>
+                                    {hacer.length ? renderActions(hacer) : <span style={{ fontSize: 11, color: 'var(--slate)' }}>—</span>}
+                                  </div>
+                                </>
                               );
-                            })}
+                            })()}
                           </div>
                         </td>
                         <td style={{ textAlign: 'center' }}>

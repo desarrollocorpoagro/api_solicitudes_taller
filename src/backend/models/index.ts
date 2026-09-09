@@ -86,7 +86,7 @@ initGastoModel(sequelize);
 //
 // Cada SolicitudRepuesto nueva genera un Gasto local (tipo_origen='REPUESTO').
 // Cada SolicitudExterno aprobada genera un Gasto local (tipo_origen='EXTERNO').
-// Cada OrdenArea con horas registradas genera un Gasto local (tipo_origen='AREA').
+// OrdenArea ya NO genera gastos (mano de obra deshabilitada del flujo de gastos).
 //
 // Los hooks afterUpdate se disparan cuando cambia el estado funcional
 // (aprobación, despacho, horas, etc.) y vuelven a llamar a la función
@@ -97,7 +97,6 @@ initGastoModel(sequelize);
 import {
   ensureLocalGastoForSolicitud,
   ensureLocalGastoForExterno,
-  ensureLocalGastoForArea,
 } from '../services/gastos.service';
 
 SolicitudRepuesto.afterCreate(async (solicitud, _options) => {
@@ -145,38 +144,6 @@ SolicitudExterno.afterUpdate(async (solicitud, _options) => {
     }
   } catch (err: any) {
     logger.warn(`[GastosHook] No se pudo crear gasto externo para solicitud ${solicitud.id}: ${err.message}`);
-  }
-});
-
-OrdenArea.afterCreate(async (area, _options) => {
-  try {
-    if (Number(area.horas ?? 0) > 0) {
-      await ensureLocalGastoForArea(area);
-    }
-  } catch (err: any) {
-    logger.warn(`[GastosHook] No se pudo crear gasto de área ${area.id}: ${err.message}`);
-  }
-});
-
-OrdenArea.afterUpdate(async (area, _options) => {
-  try {
-    if (
-      area.changed('horas') ||
-      area.changed('tarifaHora') ||
-      area.changed('costoManoObra') ||
-      area.changed('estado')
-    ) {
-      // Si cambia el estado a 'cerrada', el siguiente ciclo del sync ya
-      // no replicará porque la consulta a OrdenServicio devolverá 'Cerrada'.
-      // No eliminamos el gasto histórico (mantiene auditoría).
-      if (area.estado === 'cerrada' && Number(area.horas ?? 0) > 0) {
-        await ensureLocalGastoForArea(area);
-      } else if (Number(area.horas ?? 0) > 0) {
-        await ensureLocalGastoForArea(area);
-      }
-    }
-  } catch (err: any) {
-    logger.warn(`[GastosHook] No se pudo refrescar gasto de área ${area.id}: ${err.message}`);
   }
 });
 
@@ -243,6 +210,19 @@ export const seedInitialData = async () => {
     // al rehacer tablas con índices UNIQUE sobre role_permissions).
     // Para evolucionar el esquema en desarrollo: borrar ./data/sanluis.sqlite.
     await sequelize.sync();
+
+    // Migración idempotente: la columna tipo (artículos de servicio 'S') no se
+    // añade con sync() sin alter sobre tablas existentes.
+    try {
+      const [cols]: any = await sequelize.query(`PRAGMA table_info(catalogo_repuestos)`);
+      const hasTipo = (cols || []).some((c: any) => c.name === 'tipo');
+      if (!hasTipo) {
+        await sequelize.query(`ALTER TABLE catalogo_repuestos ADD COLUMN tipo VARCHAR(5)`);
+        logger.info('[Database] Columna catalogo_repuestos.tipo añadida (migración idempotente).');
+      }
+    } catch (migErr: any) {
+      logger.warn(`[Database] Migración catalogo_repuestos.tipo omitida: ${migErr.message}`);
+    }
 
     // 1. Semilla de Empresas (Tenants)
     const companyCount = await Company.count();
@@ -454,10 +434,10 @@ export const seedInitialData = async () => {
         { role: 'ADMIN', module: 'reports', actions: ['read', 'export', 'admin'], description: 'Auditoría y reportes financieros consolidados' },
 
         // GERENTE_TALLER
-        { role: 'GERENTE_TALLER', module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve'], description: 'Gestión operativa de taller' },
+        { role: 'GERENTE_TALLER', module: 'taller', actions: ['read', 'create', 'update', 'delete', 'approve', 'close'], description: 'Gestión operativa de taller' },
         { role: 'GERENTE_TALLER', module: 'fleet', actions: ['read', 'create', 'update'], description: 'Consulta y actualización de flota' },
-        { role: 'GERENTE_TALLER', module: 'almacen', actions: ['read', 'create'], description: 'Consulta de repuestos y solicitudes' },
-        { role: 'GERENTE_TALLER', module: 'aprobaciones', actions: ['read', 'approve', 'reject'], description: 'Aprobación de repuestos y servicios externos' },
+        { role: 'GERENTE_TALLER', module: 'almacen', actions: ['read', 'create', 'dispatch', 'update', 'admin'], description: 'Consulta, despacho y ajuste de repuestos' },
+        { role: 'GERENTE_TALLER', module: 'aprobaciones', actions: ['read', 'approve', 'reject', 'admin'], description: 'Aprobación de repuestos y servicios externos' },
         { role: 'GERENTE_TALLER', module: 'reports', actions: ['read', 'export'], description: 'Reportes de taller' },
 
         // SUPERVISOR

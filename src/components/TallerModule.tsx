@@ -29,6 +29,7 @@ import {
 import { OrdenAuditHistory } from './OrdenAuditHistory';
 import SanLuisLogo from './SanLuisLogo';
 import OrdenPicker from './OrdenPicker';
+import { useToast } from './Toast';
 
 type TallerTabId = 'apertura' | 'areas' | 'repuestos' | 'externos' | 'aprob' | 'almacen' | 'cierre' | 'auditoria';
 
@@ -282,7 +283,7 @@ export const TallerModule: React.FC<{
 
   // Estado de la orden
   const [ordNo, setOrdNo] = useState('OS-2026-00101');
-  const [estadoOrden, setEstadoOrden] = useState<'Abierta' | 'En Proceso' | 'Cerrada'>('Abierta');
+  const [estadoOrden, setEstadoOrden] = useState<'Abierta' | 'En Proceso' | 'Cerrada' | 'Anulada'>('Abierta');
   const [placa, setPlaca] = useState('A12BC3D');
   const [unidad, setUnidad] = useState<Unidad | null>(null);
   const [km, setKm] = useState(184320);
@@ -319,7 +320,6 @@ export const TallerModule: React.FC<{
   const [catalogo, setCatalogo] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [creandoOrden, setCreandoOrden] = useState(false);
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   // Form inputs para nuevas solicitudes
   const [formArea, setFormArea] = useState({ area: 'Reparaciones mayores', mecanico: 'José Ramírez', diagnostico: 'Revisión y sustitución de pastillas y discos.', horas: 2 });
@@ -337,9 +337,10 @@ export const TallerModule: React.FC<{
     return fetch(url, { ...options, headers });
   };
 
+  const { toast } = useToast();
+
   const showToast = (text: string, type: 'ok' | 'err' = 'ok') => {
-    setMsg({ type, text });
-    setTimeout(() => setMsg(null), 4500);
+    toast(text, type === 'err' ? 'error' : 'success');
   };
 
   // Cargar datos al cambiar de empresa activa o token
@@ -371,12 +372,23 @@ export const TallerModule: React.FC<{
  *  - cierre:     cerrar la orden y emitir liquidación (close).
  *  - auditoria:  solo lectura — basta con `read`.
  *
- *  Aprobaciones (aprob) muestra montos de costos: queda restringida a quienes
- *  tengan `view_costs` (o ADMIN). Los roles que solo tienen `read` en `taller`
- *  (ALMACENISTA, OPERADOR, AUDITOR) no podrán abrir ninguna pestaña operativa,
- *  pero sí verán "auditoría" porque es de solo lectura. ADMIN (acciones con
- *  `admin`) satisface cualquier requisito.
- */
+*  Aprobaciones (aprob) muestra montos de costos: queda restringida a quienes
+   *  tengan `view_costs` (o ADMIN). Los roles que solo tienen `read` en `taller`
+   *  (ALMACENISTA, OPERADOR, AUDITOR) no podrán abrir ninguna pestaña operativa,
+   *  pero sí verán "auditoría" porque es de solo lectura. ADMIN (acciones con
+   *  `admin`) satisface cualquier requisito.
+   */
+  const TALLER_TAB_MODULES: Record<TallerTabId, string[]> = {
+    apertura: ['taller'],
+    areas: ['taller'],
+    repuestos: ['taller'],
+    externos: ['taller'],
+    aprob: ['aprobaciones', 'taller'],
+    almacen: ['almacen', 'taller'],
+    cierre: ['taller'],
+    auditoria: ['taller'],
+  };
+
   const TALLER_TAB_WRITE: Record<TallerTabId, string[]> = {
     apertura: ['create', 'admin'],
     areas: ['update', 'admin'],
@@ -392,17 +404,29 @@ export const TallerModule: React.FC<{
     // Si los permisos aún no han llegado, mostramos todo (modo compatibilidad).
     // En cuanto `rolePerms` se materializa (incluso vacío), se respeta estrictamente.
     if (!rolePerms) return true;
-    const perms = rolePerms.taller || [];
-    // Rol sin permisos cargados → denegar.
-    if (perms.length === 0) return false;
-    // ADMIN u override con acción `admin` → acceso total.
-    if (perms.includes('admin') || isAdminRole(currentUser?.role)) return true;
-    // Cualquier otra acción califica para la pestaña correspondiente.
-    return TALLER_TAB_WRITE[tabId].some((a) => perms.includes(a));
+    // ADMIN con rol global → acceso total.
+    if (isAdminRole(currentUser?.role)) return true;
+    // La pestaña se evalúa contra los módulos donde viven sus acciones
+    // (p.ej. almacen → 'almacen', aprob → 'aprobaciones').
+    for (const moduleName of TALLER_TAB_MODULES[tabId]) {
+      const perms = rolePerms[moduleName] || [];
+      if (perms.length === 0) continue;
+      if (perms.includes('admin')) return true;
+      if (TALLER_TAB_WRITE[tabId].some((a) => perms.includes(a))) return true;
+    }
+    return false;
   };
 
   const canViewLaborCosts = Boolean(
     isAdminRole(currentUser?.role) || rolePerms?.taller?.includes('view_costs')
+  );
+
+  // Puede anular órdenes: roles administrativos por defecto o quien tenga la
+  // acción `delete` en el módulo taller (matriz RBAC). Coincide con el backend.
+  const canAnularOrden = Boolean(
+    isAdminRole(currentUser?.role)
+    || String(currentUser?.role || '').toUpperCase() === 'GERENTE_TALLER'
+    || rolePerms?.taller?.includes('delete')
   );
 
   // Si el menú superior pasa una `initialTab` y aún no estamos en ella, sincronizamos.
@@ -641,11 +665,11 @@ export const TallerModule: React.FC<{
 
   const handleCrearNuevaOrden = async () => {
     if (!unidad) {
-      alert('Debe identificar una unidad perteneciente a la empresa activa antes de aperturar la orden.');
+      showToast('Debe identificar una unidad perteneciente a la empresa activa antes de aperturar la orden.', 'err');
       return;
     }
     if (!areaInicial.trim()) {
-      alert('Debe seleccionar el Área de Servicio antes de aperturar la orden de servicio.');
+      showToast('Debe seleccionar el Área de Servicio antes de aperturar la orden de servicio.', 'err');
       // Hacer scroll al campo para que el usuario lo vea
       const el = document.getElementById('apertura-area-input');
       if (el) {
@@ -655,11 +679,11 @@ export const TallerModule: React.FC<{
       return;
     }
     if (!mecanicoAreaInicial.trim()) {
-      alert('Debe indicar el mecánico asignado al área solicitada.');
+      showToast('Debe indicar el mecánico asignado al área solicitada.', 'err');
       return;
     }
     if (!sintomas.trim()) {
-      alert('Debe registrar los síntomas o motivo de ingreso reportados.');
+      showToast('Debe registrar los síntomas o motivo de ingreso reportados.', 'err');
       return;
     }
 
@@ -733,8 +757,10 @@ export const TallerModule: React.FC<{
       showToast('No hay una orden de servicio seleccionada.', 'err');
       return;
     }
-    if (estadoOrden === 'Cerrada') {
-      showToast('No se puede modificar una orden que ya ha sido cerrada.', 'err');
+    if (estadoOrden === 'Cerrada' || estadoOrden === 'Anulada') {
+      showToast(estadoOrden === 'Anulada'
+        ? 'No se puede modificar una orden que ha sido anulada.'
+        : 'No se puede modificar una orden que ya ha sido cerrada.', 'err');
       return;
     }
 
@@ -765,7 +791,7 @@ export const TallerModule: React.FC<{
 
   const handleCrearArea = async () => {
     if (!formArea.area || !formArea.mecanico) {
-      alert('Complete el área y mecánico asignado');
+      showToast('Complete el área y mecánico asignado', 'err');
       return;
     }
     try {
@@ -806,7 +832,7 @@ export const TallerModule: React.FC<{
   const handleCrearRepuesto = async () => {
     const targetOt = formRep.otId || (ots[0] ? ots[0].id : '');
     if (!targetOt || !formRep.cod || formRep.cant < 1) {
-      alert('Seleccione orden de área, código de repuesto y cantidad válida');
+      showToast('Seleccione orden de área, código de repuesto y cantidad válida', 'err');
       return;
     }
     try {
@@ -830,7 +856,7 @@ export const TallerModule: React.FC<{
   const handleCrearExterno = async () => {
     const targetOt = formExt.otId || (ots[0] ? ots[0].id : '');
     if (!targetOt || !formExt.proveedor || !formExt.descripcion) {
-      alert('Complete orden de área, proveedor y descripción');
+      showToast('Complete orden de área, proveedor y descripción', 'err');
       return;
     }
     try {
@@ -895,7 +921,7 @@ export const TallerModule: React.FC<{
 
   const handleCerrarOrden = async () => {
     if (!recibeConforme.trim()) {
-      alert('Debe indicar el nombre de quien recibe conforme.');
+      showToast('Debe indicar el nombre de quien recibe conforme.', 'err');
       return;
     }
     try {
@@ -919,7 +945,35 @@ export const TallerModule: React.FC<{
           setCompanyOrders(dataOrdenes.data);
         }
       } else {
-        alert(`Bloqueo de Cierre:\n${(data.bloqueos || [data.error]).join('\n')}`);
+        showToast(`Bloqueo de Cierre:\n${(data.bloqueos || [data.error]).join('\n')}`, 'err');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'err');
+    }
+  };
+
+  const handleAnularOrden = async () => {
+    if (!canAnularOrden) return;
+    const motivoTxt = window.prompt(
+      '¿Confirmar anulación de la orden ' + ordNo + '?\n\nLa orden quedará con estado "Anulada" (no se elimina, queda trazabilidad) y el estatus se sincroniza con el ERP. Uso reservado a control de calidad: solo se anulan órdenes mal aperturadas.\n\nOpcional: indique el motivo de la anulación.',
+      'Apertura por error'
+    );
+    if (motivoTxt === null) return;
+    try {
+      const res = await authFetch(`/api/v1/ordenes/${ordNo}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ motivo: motivoTxt.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEstadoOrden('Anulada');
+        showToast(data.message || 'Orden anulada');
+        cargarOrdenActual(ordNo);
+        const resOrdenes = await authFetch('/api/v1/ordenes');
+        const dataOrdenes = await resOrdenes.json();
+        if (dataOrdenes.success) setCompanyOrders(dataOrdenes.data);
+      } else {
+        showToast(data.error, 'err');
       }
     } catch (err: any) {
       showToast(err.message, 'err');
@@ -970,17 +1024,6 @@ export const TallerModule: React.FC<{
 
   return (
     <div className="wrap">
-      {/* Toast Notification */}
-      {msg && (
-        <div className={`note ${msg.type === 'ok' ? 'n-ok' : 'n-bad'}`} style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {msg.type === 'ok' ? <CheckCircle className="w-4 h-4 text-[var(--ok)]" /> : <AlertCircle className="w-4 h-4 text-[var(--bad)]" />}
-            <span>{msg.text}</span>
-          </div>
-          <button onClick={() => setMsg(null)} className="btn" style={{ minHeight: 'auto', padding: '2px 8px', fontSize: 12 }}>Cerrar</button>
-        </div>
-      )}
-
       {/* Banner de Contexto de Empresa y Selector de Órdenes */}
       <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid var(--navy)', background: '#ffffff' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -1017,7 +1060,7 @@ export const TallerModule: React.FC<{
                   setDiagnosticoInicial('');
                 }
               }}
-              orders={companyOrders.filter((o) => o.estado !== 'Cerrada')}
+              orders={companyOrders.filter((o) => o.estado !== 'Cerrada' && o.estado !== 'Anulada')}
               allowNueva
               placeholder="Buscar por placa o nº de orden…"
               onFeedback={(msg, ok) => showToast(msg, ok ? 'ok' : 'err')}
@@ -1666,14 +1709,16 @@ export const TallerModule: React.FC<{
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: 'var(--slate)' }}>
               <span className="hint" style={{ marginBottom: 0 }}>
-                {estadoOrden === 'Cerrada'
-                  ? 'Esta orden ya fue cerrada. No se puede modificar.'
-                  : 'Confirme los datos capturados para aperturar la orden.'}
+                {estadoOrden === 'Anulada'
+                  ? 'Esta orden fue anulada. No se puede modificar ni cerrar.'
+                  : estadoOrden === 'Cerrada'
+                    ? 'Esta orden ya fue cerrada. No se puede modificar.'
+                    : 'Confirme los datos capturados para aperturar la orden.'}
               </span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              {estadoOrden !== 'Cerrada' && (
+              {estadoOrden !== 'Cerrada' && estadoOrden !== 'Anulada' && (
                 <button
                   type="button"
                   onClick={handleActualizarOrdenExistente}
@@ -2166,7 +2211,7 @@ export const TallerModule: React.FC<{
                   <div className="grid g3" style={{ background: '#fff', padding: 10, borderRadius: 'var(--r)', marginBottom: 8 }}>
                     <div><span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Solicitado:</span><span className="mono font-bold" style={{ display: 'block' }}>{r.cant}</span></div>
                     <div><span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Existencia:</span><span className="mono" style={{ display: 'block' }}>{r.stockActual}</span></div>
-                    <div><span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Almacén:</span><span className="mono" style={{ display: 'block' }}>TLL-01</span></div>
+                    <div><span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--slate)' }}>Almacén:</span><span className="mono" style={{ display: 'block' }}>01</span></div>
                   </div>
                   {r.estadoEntrega === 'Backorder' && (
                     <div className="note n-bad" style={{ fontSize: 12 }}>
@@ -2299,12 +2344,35 @@ export const TallerModule: React.FC<{
 
           <button
             onClick={handleCerrarOrden}
-            disabled={!puedeCerrar || estadoOrden === 'Cerrada'}
+            disabled={!puedeCerrar || estadoOrden === 'Cerrada' || estadoOrden === 'Anulada'}
             className="btn amber"
             style={{ width: '100%', fontSize: 16 }}
           >
-            {estadoOrden === 'Cerrada' ? 'Orden de Servicio Cerrada' : 'Cerrar orden de servicio'}
+            {estadoOrden === 'Anulada'
+              ? 'Orden de Servicio Anulada'
+              : estadoOrden === 'Cerrada'
+                ? 'Orden de Servicio Cerrada'
+                : 'Cerrar orden de servicio'}
           </button>
+
+          {(estadoOrden === 'Abierta' || estadoOrden === 'En Proceso') && canAnularOrden && (
+            <button
+              type="button"
+              onClick={handleAnularOrden}
+              className="btn"
+              style={{
+                width: '100%',
+                fontSize: 13,
+                marginTop: 8,
+                background: '#fef2f2',
+                borderColor: '#fca5a5',
+                color: '#b91c1c',
+              }}
+              title="Anula la orden de servicio (queda con estado Anulada y se sincroniza con el ERP). Acción de control de calidad."
+            >
+              Anular orden de servicio
+            </button>
+          )}
         </div>
       </div>
 

@@ -17,6 +17,7 @@ import {
   User
 } from 'lucide-react';
 import SanLuisLogo from './SanLuisLogo';
+import { useToast } from './Toast';
 
 interface LoginScreenProps {
   onLoginSuccess: (data: {
@@ -28,10 +29,10 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+  const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
   // Paso 2: Selección de Empresa Multi-Tenant (si aplica)
   const [preAuthData, setPreAuthData] = useState<{
@@ -44,7 +45,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMessage('');
 
     try {
       const res = await fetch('/api/v1/auth/login', {
@@ -78,7 +78,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         setSelectedCompanyId(availableCompanies[0]?.id || '');
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error de conexión con el servidor.');
+      toast(err.message || 'Error de conexión con el servidor.', 'error');
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     compsList?: any[]
   ) => {
     setLoading(true);
-    setErrorMessage('');
 
     const token = tokenToUse || preAuthData?.preAuthToken;
     const currentUser = userData || preAuthData?.user;
@@ -121,7 +120,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         companies: currentCompanies,
       });
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error al seleccionar empresa.');
+      toast(err.message || 'Error al seleccionar empresa.', 'error');
     } finally {
       setLoading(false);
     }
@@ -130,7 +129,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const handleQuickLogin = (userEmail: string, userPass: string) => {
     setEmail(userEmail);
     setPassword(userPass);
-    setErrorMessage('');
   };
 
   return (
@@ -179,13 +177,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             boxShadow: '0 4px 16px rgba(0, 35, 71, 0.08)',
           }}
         >
-          {errorMessage && (
-            <div className="note n-bad" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertCircle className="w-4 h-4 shrink-0 text-[var(--bad)]" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
           {!preAuthData ? (
             /* PASO 1: Formulario de Credenciales */
             <form onSubmit={handleCredentialsSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

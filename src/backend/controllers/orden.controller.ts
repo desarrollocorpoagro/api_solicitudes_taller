@@ -15,6 +15,7 @@ import { SyncService } from '../services/sync.service';
 import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 import { getTenantContext, getAuthorizedPlatesForTenant } from '../utils/tenantHelper';
+import { TENANT_ISOLATION_ENABLED } from '../config/featureFlags';
 import { findUnidadByPlaca, resolveVendedorCedula } from '../utils/flotaLookup';
 import { profitMirrorSequelize } from '../config/profitDb';
 
@@ -195,8 +196,9 @@ export class OrdenController {
         });
       }
 
-      // Validar que la unidad pertenece a la empresa activa
-      if (tenant) {
+      // Validar que la unidad pertenece a la empresa activa (aislamiento TENANT,
+      // desactivado temporalmente por defecto)
+      if (TENANT_ISOLATION_ENABLED && tenant) {
         const matchesId = unidad.companyId && unidad.companyId === tenant.companyId;
         const matchesName = unidad.empresa && unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase();
         if (!matchesId && !matchesName) {
@@ -333,7 +335,7 @@ export class OrdenController {
 
       // Aplicar filtro estricto por tenant/empresa activa
       const tenant = await getTenantContext(req);
-      if (tenant) {
+      if (TENANT_ISOLATION_ENABLED && tenant) {
         const authorizedPlates = await getAuthorizedPlatesForTenant(req);
         where[Op.or] = [
           { tenantId: tenant.companyId },
@@ -387,7 +389,7 @@ export class OrdenController {
       // Bypass: ADMIN global puede consultar órdenes de cualquier tenant.
       const tenant = await getTenantContext(req);
       const isAdminGlobal = req.user?.role?.toUpperCase() === 'ADMIN';
-      if (tenant && !isAdminGlobal) {
+      if (TENANT_ISOLATION_ENABLED && tenant && !isAdminGlobal) {
         const matchesTenantId = orden.tenantId && orden.tenantId === tenant.companyId;
         const matchesVehicleCompany = unidad && (unidad.empresa && unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase());
 
@@ -445,7 +447,7 @@ export class OrdenController {
       // Bypass: ADMIN global puede cerrar órdenes de cualquier tenant.
       const tenant = await getTenantContext(req);
       const isAdminGlobal = req.user?.role?.toUpperCase() === 'ADMIN';
-      if (tenant && !isAdminGlobal) {
+      if (TENANT_ISOLATION_ENABLED && tenant && !isAdminGlobal) {
         const matchesTenantId = orden.tenantId && orden.tenantId === tenant.companyId;
         const matchesVehicleCompany = unidad && (unidad.empresa && unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase());
         if (!matchesTenantId && !matchesVehicleCompany) {
@@ -457,8 +459,13 @@ export class OrdenController {
         }
       }
 
-      if (orden.estado === 'Cerrada') {
-        return res.status(400).json({ success: false, error: 'La orden ya se encuentra cerrada.' });
+      if (orden.estado === 'Cerrada' || orden.estado === 'Anulada') {
+        return res.status(400).json({
+          success: false,
+          error: orden.estado === 'Anulada'
+            ? 'La orden fue anulada y no puede cerrarse.'
+            : 'La orden ya se encuentra cerrada.',
+        });
       }
 
       const validacion = OrdenController.validateCierre(orden, unidad);
@@ -585,7 +592,7 @@ export class OrdenController {
       // Bypass: ADMIN global puede modificar órdenes de cualquier tenant.
       const tenant = await getTenantContext(req);
       const isAdminGlobal = req.user?.role?.toUpperCase() === 'ADMIN';
-      if (tenant && !isAdminGlobal && orden.tenantId && orden.tenantId !== tenant.companyId) {
+      if (TENANT_ISOLATION_ENABLED && tenant && !isAdminGlobal && orden.tenantId && orden.tenantId !== tenant.companyId) {
         return res.status(403).json({
           success: false,
           error: `Acceso denegado: No puede modificar la orden ${id} desde otra empresa.`,
@@ -593,10 +600,12 @@ export class OrdenController {
         });
       }
 
-      if (orden.estado === 'Cerrada') {
+      if (orden.estado === 'Cerrada' || orden.estado === 'Anulada') {
         return res.status(400).json({
           success: false,
-          error: 'No se pueden modificar datos de una orden de servicio que ya ha sido cerrada.',
+          error: orden.estado === 'Anulada'
+            ? 'No se pueden modificar datos de una orden de servicio anulada.'
+            : 'No se pueden modificar datos de una orden de servicio que ya ha sido cerrada.',
         });
       }
 
@@ -646,6 +655,115 @@ export class OrdenController {
       });
     } catch (error: any) {
       logger.error(`[OrdenController] Error actualizando orden: ${error.message}`);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Anula una Orden de Servicio en estado Abierta o En Proceso.
+   *
+   * La anulación NO elimina el registro: conserva la orden para trazabilidad
+   * marcándola con estado 'Anulada', registra el motivo en auditoría y
+   * sincroniza el cambio de estatus con MSSQL Profit Plus (ad_trans).
+   */
+  static async anularOrden(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { motivo } = req.body;
+
+      const orden = await OrdenServicio.findByPk(id, {
+        include: [
+          { model: OrdenArea, as: 'ordenesArea' },
+          { model: SolicitudRepuesto, as: 'solicitudesRepuesto' },
+          { model: SolicitudExterno, as: 'solicitudesExterno' },
+        ],
+      });
+
+      if (!orden) {
+        return res.status(404).json({ success: false, error: 'Orden de servicio no encontrada.' });
+      }
+
+      const unidad = await findUnidadByPlaca(orden.placa);
+
+      // Validar aislamiento multi-tenant
+      // Bypass: ADMIN global puede anular órdenes de cualquier tenant.
+      const tenant = await getTenantContext(req);
+      const isAdminGlobal = req.user?.role?.toUpperCase() === 'ADMIN';
+      if (TENANT_ISOLATION_ENABLED && tenant && !isAdminGlobal) {
+        const matchesTenantId = orden.tenantId && orden.tenantId === tenant.companyId;
+        const matchesVehicleCompany = unidad && (unidad.empresa && unidad.empresa.toLowerCase() === tenant.companyName.toLowerCase());
+        if (!matchesTenantId && !matchesVehicleCompany) {
+          return res.status(403).json({
+            success: false,
+            error: `Acceso denegado: No puede anular la orden ${id} desde ${tenant.companyName}.`,
+            code: 'TENANT_ISOLATION_VIOLATION',
+          });
+        }
+      }
+
+      if (['Cerrada', 'Anulada'].includes(orden.estado)) {
+        return res.status(400).json({
+          success: false,
+          error: `No se puede anular una orden en estado "${orden.estado}". Solo se anulan órdenes Abiertas o En Proceso.`,
+        });
+      }
+
+      const estadoAnterior = orden.estado;
+      orden.estado = 'Anulada';
+      await orden.save();
+
+      // Sincronizar anulación en MSSQL Profit Plus (ad_trans.dbo.flota_ordenes_servicio)
+      try {
+        const profitOrden = await FlotaOrdenServicioProfit.findOne({ where: { nro_orden: orden.id } });
+        if (profitOrden) {
+          profitOrden.estatus = 'ANULADA';
+          await profitOrden.save();
+          logger.info(`[OrdenController] Anulación de orden ${orden.id} sincronizada en MSSQL AD_TRANS`);
+        } else {
+          await SyncService.enqueueOperation({
+            entityType: 'ORDEN_SERVICIO',
+            entityId: orden.id,
+            operation: 'UPDATE',
+            payload: orden.toJSON(),
+            companyId: tenant?.companyId,
+          });
+        }
+      } catch (mssqlErr: any) {
+        logger.warn(`[OrdenController] Encolando anulación de orden ${orden.id} para sincronización diferida con MSSQL: ${mssqlErr.message}`);
+        await SyncService.enqueueOperation({
+          entityType: 'ORDEN_SERVICIO',
+          entityId: orden.id,
+          operation: 'UPDATE',
+          payload: orden.toJSON(),
+          companyId: tenant?.companyId,
+        });
+      }
+
+      // Registrar auditoría de anulación
+      const areaCount = (orden.ordenesArea || []).length;
+      const repuestosCount = (orden.solicitudesRepuesto || []).length;
+      const externosCount = (orden.solicitudesExterno || []).length;
+      const motivoTxt = (motivo || '').toString().trim();
+
+      await AuditService.recordLog({
+        ordenId: orden.id,
+        action: 'ANULACION_ORDEN',
+        fieldName: 'estado',
+        previousValue: estadoAnterior,
+        newValue: 'Anulada',
+        description: `Anulación de la Orden de Servicio ${orden.id} para la unidad ${orden.placa}. Estado previo: ${estadoAnterior}. Movimientos asociados: ${areaCount} área(s), ${repuestosCount} repuesto(s), ${externosCount} externo(s).${motivoTxt ? ` Motivo: ${motivoTxt}` : ''}`,
+        req,
+      });
+
+      logger.info(`[OrdenController] Orden de servicio ${orden.id} anulada (estado previo: ${estadoAnterior})${motivoTxt ? ` - Motivo: ${motivoTxt}` : ''}`);
+
+      return res.json({
+        success: true,
+        message: 'Orden de servicio anulada. El registro se conserva con estado "Anulada" y la anulación fue sincronizada con el ERP.',
+        data: orden,
+      });
+    } catch (error: any) {
+      logger.error(`[OrdenController] Error anulando orden: ${error.message}`);
       return res.status(500).json({ success: false, error: error.message });
     }
   }

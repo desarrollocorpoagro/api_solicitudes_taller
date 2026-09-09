@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Image, Upload, Trash2, FileText, CheckCircle, ExternalLink, Download, Copy, Shield, Sparkles } from 'lucide-react';
+import { Image, Upload, Trash2, FileText, ExternalLink, Download, Copy, Shield, Sparkles } from 'lucide-react';
 import SanLuisLogo from './SanLuisLogo';
 import OrdenPicker from './OrdenPicker';
+import { useToast } from './Toast';
 
 export const MultimediaModule: React.FC = () => {
+  const { toast } = useToast();
   const [files, setFiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [ordenId, setOrdenId] = useState('OS-2026-00101');
   const [tipo, setTipo] = useState('foto_sintoma');
-  const [toast, setToast] = useState<string | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
 
   useEffect(() => {
@@ -57,7 +58,7 @@ export const MultimediaModule: React.FC = () => {
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) {
-      alert('Seleccione un archivo fotográfico o documento para subir.');
+      toast('Seleccione un archivo fotográfico o documento para subir.', 'error');
       return;
     }
 
@@ -77,28 +78,20 @@ export const MultimediaModule: React.FC = () => {
       if (contentType.includes('application/json')) {
         const data = await res.json();
         if (data.success) {
-          setToast('Archivo multimedia cargado con éxito.');
+          toast('Archivo multimedia cargado con éxito.', 'success');
           setSelectedFile(null);
           fetchFiles();
         } else {
-          alert(data.error || 'Error al subir archivo');
+          toast(data.error || 'Error al subir archivo', 'error');
         }
       }
     } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setTimeout(() => setToast(null), 4000);
+      toast(err.message, 'error');
     }
   };
 
   return (
     <div className="space-y-6">
-      {toast && (
-        <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-emerald-600" /> {toast}
-        </div>
-      )}
-
       {/* Formulario de Carga */}
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
         <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -117,7 +110,7 @@ export const MultimediaModule: React.FC = () => {
               onChange={setOrdenId}
               orders={orders}
               placeholder="Buscar por placa o nº de orden…"
-              onFeedback={(msg) => setToast(msg)}
+              onFeedback={(msg, ok) => toast(msg, ok ? 'success' : 'error')}
             />
           </div>
 

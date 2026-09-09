@@ -24,6 +24,7 @@ import {
   Check,
   AlertTriangle,
 } from 'lucide-react';
+import { useToast } from './Toast';
 
 export interface AuditRecord {
   id: number;
@@ -55,9 +56,9 @@ export const OrdenAuditHistory: React.FC<OrdenAuditHistoryProps> = ({
   activeCompany,
   subOts = [],
 }) => {
+  const { toast } = useToast();
   const [logs, setLogs] = useState<AuditRecord[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Filtros
   const [actionFilter, setActionFilter] = useState<string>('ALL');
@@ -71,12 +72,10 @@ export const OrdenAuditHistory: React.FC<OrdenAuditHistoryProps> = ({
   const [noteOtId, setNoteOtId] = useState('');
   const [noteCategory, setNoteCategory] = useState('Inspección de Calidad');
   const [submittingNote, setSubmittingNote] = useState(false);
-  const [toastMsg, setToastMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const fetchAuditLogs = async () => {
     if (!ordenId) return;
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch(`/api/v1/ordenes/${ordenId}/auditoria`, {
         headers: {
@@ -89,10 +88,10 @@ export const OrdenAuditHistory: React.FC<OrdenAuditHistoryProps> = ({
       if (data.success) {
         setLogs(data.data || []);
       } else {
-        setError(data.error || 'Error al cargar la bitácora de auditoría.');
+        toast(data.error || 'Error al cargar la bitácora de auditoría.', 'error');
       }
     } catch (err: any) {
-      setError(err.message || 'Error de conexión con el servidor.');
+      toast(err.message || 'Error de conexión con el servidor.', 'error');
     } finally {
       setLoading(false);
     }
@@ -105,7 +104,7 @@ export const OrdenAuditHistory: React.FC<OrdenAuditHistoryProps> = ({
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!noteContent.trim()) {
-      setToastMsg({ type: 'err', text: 'Debe ingresar el detalle de la observación técnica.' });
+      toast('Debe ingresar el detalle de la observación técnica.', 'error');
       return;
     }
 
@@ -126,18 +125,17 @@ export const OrdenAuditHistory: React.FC<OrdenAuditHistoryProps> = ({
       });
       const data = await res.json();
       if (data.success) {
-        setToastMsg({ type: 'ok', text: 'Observación de auditoría registrada correctamente.' });
+        toast('Observación de auditoría registrada correctamente.', 'success');
         setNoteContent('');
         setShowNoteForm(false);
         fetchAuditLogs();
       } else {
-        setToastMsg({ type: 'err', text: data.error || 'Error al registrar la observación.' });
+        toast(data.error || 'Error al registrar la observación.', 'error');
       }
     } catch (err: any) {
-      setToastMsg({ type: 'err', text: err.message || 'Error de red.' });
+      toast(err.message || 'Error de red.', 'error');
     } finally {
       setSubmittingNote(false);
-      setTimeout(() => setToastMsg(null), 4000);
     }
   };
 
@@ -279,20 +277,6 @@ export const OrdenAuditHistory: React.FC<OrdenAuditHistoryProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Toast Notification */}
-      {toastMsg && (
-        <div
-          className={`p-3 rounded-lg border flex items-center gap-2 text-sm font-medium transition-all ${
-            toastMsg.type === 'ok'
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              : 'bg-red-50 text-red-800 border-red-200'
-          }`}
-        >
-          {toastMsg.type === 'ok' ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <AlertCircle className="w-5 h-5 text-red-600" />}
-          <span>{toastMsg.text}</span>
-        </div>
-      )}
-
       {/* Header y Resumen de Auditoría */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
@@ -595,18 +579,6 @@ export const OrdenAuditHistory: React.FC<OrdenAuditHistoryProps> = ({
           <RefreshCw className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-3" />
           <p className="text-sm font-semibold text-slate-700">Cargando bitácora de auditoría...</p>
           <p className="text-xs text-slate-400 mt-1">Consultando registros históricos en base de datos</p>
-        </div>
-      ) : error ? (
-        <div className="bg-red-50 rounded-xl border border-red-200 p-6 text-center shadow-sm">
-          <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-red-800">{error}</p>
-          <button
-            type="button"
-            onClick={fetchAuditLogs}
-            className="mt-3 px-3 py-1.5 text-xs font-semibold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-          >
-            Reintentar
-          </button>
         </div>
       ) : filteredLogs.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-sm">

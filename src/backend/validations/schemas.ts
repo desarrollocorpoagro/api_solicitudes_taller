@@ -1,5 +1,18 @@
 import Joi from 'joi';
 
+// Roles válidos según la matriz RBAC (seed en models/index.ts).
+export const ROLES_VALIDOS = [
+  'ADMIN',
+  'GERENTE_TALLER',
+  'SUPERVISOR',
+  'RESPONSABLE_FLOTA',
+  'MECANICO',
+  'ALMACENISTA',
+  'SOLICITANTE',
+  'AUDITOR',
+  'OPERADOR',
+] as const;
+
 // 1. Autenticación
 export const loginSchema = {
   body: Joi.object({
@@ -30,8 +43,26 @@ export const createUserSchema = {
     email: Joi.string().email().required(),
     password: Joi.string().min(6).required(),
     phone: Joi.string().allow('', null),
-    role: Joi.string().valid('ADMIN', 'GERENTE_TALLER', 'MECANICO', 'RESPONSABLE_FLOTA', 'ALMACENISTA', 'OPERADOR').default('OPERADOR'),
+    role: Joi.string().valid(...ROLES_VALIDOS).default('OPERADOR'),
     isActive: Joi.boolean().default(true),
+    // Aceptar multi-tenant desde el frontend (el controlador crea el pivote user_companies).
+    companyIds: Joi.array().items(Joi.string().uuid()).optional(),
+    assignedCompanies: Joi.array()
+      .items(
+        Joi.object({
+          companyId: Joi.string().uuid().required(),
+          role: Joi.string().valid(...ROLES_VALIDOS).optional(),
+          permissions: Joi.array()
+            .items(
+              Joi.object({
+                module: Joi.string().required(),
+                actions: Joi.array().items(Joi.string()).required(),
+              })
+            )
+            .optional(),
+        })
+      )
+      .optional(),
   }),
 };
 
@@ -44,7 +75,7 @@ export const updateUserSchema = {
     email: Joi.string().email(),
     password: Joi.string().min(6).allow('', null),
     phone: Joi.string().allow('', null),
-    role: Joi.string().valid('ADMIN', 'GERENTE_TALLER', 'MECANICO', 'RESPONSABLE_FLOTA', 'ALMACENISTA', 'OPERADOR'),
+    role: Joi.string().valid(...ROLES_VALIDOS),
     isActive: Joi.boolean(),
     // Aceptar reasignación multi-tenant desde el frontend.
     // El controlador (user.controller.ts#updateUser) los procesa para sincronizar
@@ -55,7 +86,7 @@ export const updateUserSchema = {
         Joi.object({
           companyId: Joi.string().uuid().required(),
           role: Joi.string()
-            .valid('ADMIN', 'GERENTE_TALLER', 'MECANICO', 'RESPONSABLE_FLOTA', 'ALMACENISTA', 'OPERADOR')
+            .valid(...ROLES_VALIDOS)
             .optional(),
           permissions: Joi.array()
             .items(
@@ -84,7 +115,7 @@ export const createCompanySchema = {
 export const assignUserCompanySchema = {
   body: Joi.object({
     companyId: Joi.string().uuid().required(),
-    role: Joi.string().valid('ADMIN', 'GERENTE_TALLER', 'MECANICO', 'RESPONSABLE_FLOTA', 'ALMACENISTA', 'OPERADOR').required(),
+    role: Joi.string().valid(...ROLES_VALIDOS).required(),
     permissions: Joi.array().items(
       Joi.object({
         module: Joi.string().required(),

@@ -3,10 +3,10 @@
  *
  * Servicio de gastos locales con sincronización a MSSQL Profit Plus.
  *
- * Tres orígenes de captura:
- *   1. AREA       → ensureLocalGastoForArea(ordenArea)        — mano de obra
- *   2. REPUESTO   → ensureLocalGastoForRepuesto(solicitud)  — repuestos aprobados/despachados
- *   3. EXTERNO    → ensureLocalGastoForExterno(solicitud)   — servicios externos aprobados
+ * Dos orígenes de captura (AREA/mano de obra quedó deshabilitado: OrdenArea
+ * ya no genera gastos):
+ *   1. REPUESTO   → ensureLocalGastoForRepuesto(solicitud)  — repuestos aprobados/despachados
+ *   2. EXTERNO    → ensureLocalGastoForExterno(solicitud)   — servicios externos aprobados
  *
  * Cada origen setea `tipo_origen` e `id_origen_referencia`. La `idempotency_key`
  * se deriva automáticamente como `${tipo_origen}:${id_origen_referencia}`,
@@ -40,7 +40,6 @@ import {
   SolicitudRepuesto,
   SolicitudExterno,
   OrdenServicio,
-  OrdenArea,
 } from '../models';
 import {
   profitMirrorSequelize,
@@ -139,8 +138,8 @@ export function validateGastoDraft(draft: {
   if (!draft.id_origen_referencia || draft.id_origen_referencia.trim() === '') {
     errors.push('El campo id_origen_referencia es obligatorio.');
   }
-  if (!draft.tipo_origen || !['AREA', 'REPUESTO', 'EXTERNO'].includes(draft.tipo_origen)) {
-    errors.push('El campo tipo_origen debe ser AREA, REPUESTO o EXTERNO.');
+  if (!draft.tipo_origen || !['REPUESTO', 'EXTERNO'].includes(draft.tipo_origen)) {
+    errors.push('El campo tipo_origen debe ser REPUESTO o EXTERNO (AREA ya no genera gastos).');
   }
   if (draft.monto !== undefined && draft.monto !== null && Number(draft.monto) < 0) {
     errors.push('El monto no puede ser negativo.');
@@ -154,6 +153,24 @@ export function validateGastoDraft(draft: {
 // ─────────────────────────────────────────────────────────────────────────────
 // Captura: helper de bajo nivel
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Normaliza el proveedor de un gasto: si viene nulo o en blanco, usa 'GEN'
+ * (genérico). Aplica tanto al guardado local como al upsert a MSSQL.
+ */
+const defaultProveedor = (v?: string | null): string => {
+  const t = String(v ?? '').trim();
+  return t || 'GEN';
+};
+
+/**
+ * Normaliza el cliente de un gasto: si viene nulo o en blanco, usa 'GEN'
+ * (genérico). Aplica tanto al guardado local como al upsert a MSSQL.
+ */
+export const defaultCliente = (v?: string | null): string => {
+  const t = String(v ?? '').trim();
+  return t || 'GEN';
+};
 
 /**
  * Inserta o actualiza un gasto local para la clave (tipo_origen, id_origen_referencia).
@@ -206,8 +223,8 @@ async function upsertGastoLocal(params: {
   if (existente) {
     existente.codigo_articulo = params.codigo_articulo ?? existente.codigo_articulo;
     existente.codigo_subalmacen = params.codigo_subalmacen?.trim() || existente.codigo_subalmacen?.trim() || '01';
-    existente.co_prov = params.co_prov ?? existente.co_prov;
-    existente.co_cli = params.co_cli ?? existente.co_cli;
+    existente.co_prov = defaultProveedor(params.co_prov ?? existente.co_prov);
+    existente.co_cli = defaultCliente(params.co_cli ?? existente.co_cli);
     existente.cantidad = params.cantidad ?? existente.cantidad;
     existente.unidad = params.unidad ?? existente.unidad;
     existente.horas_trabajadas = params.horas_trabajadas ?? existente.horas_trabajadas;
@@ -234,8 +251,8 @@ async function upsertGastoLocal(params: {
     ordenId: params.ordenId,
     codigo_articulo: params.codigo_articulo ?? null,
     codigo_subalmacen: params.codigo_subalmacen?.trim() || '01',
-    co_prov: params.co_prov ?? 'GEN',
-    co_cli: params.co_cli ?? null,
+    co_prov: defaultProveedor(params.co_prov),
+    co_cli: defaultCliente(params.co_cli),
     cantidad: params.cantidad ?? 0,
     unidad: params.unidad ?? null,
     horas_trabajadas: params.horas_trabajadas ?? 0,
@@ -255,38 +272,7 @@ async function upsertGastoLocal(params: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Captura desde OrdenArea (mano de obra)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Garantiza que exista un Gasto local para una OrdenArea (mano de obra).
- * El monto se calcula como `horas * tarifaHora`. Si la OrdenArea cambia
- * (horas/tarifa), se actualiza el gasto existente y se re-marcarará PENDIENTE.
- */
-export async function ensureLocalGastoForArea(ordenArea: OrdenArea): Promise<Gasto | null> {
-  const horas = Number(ordenArea.horas ?? 0);
-  const tarifa = Number(ordenArea.tarifaHora ?? 0);
-  const monto = Number((horas * tarifa).toFixed(4));
-
-  if (horas <= 0 || monto <= 0) {
-    logger.debug(`[GastosService] OrdenArea ${ordenArea.id} sin horas/tarifa válidas; gasto omitido.`);
-    return null;
-  }
-
-  return upsertGastoLocal({
-    tipo_origen: 'AREA',
-    id_origen_referencia: ordenArea.id,
-    ordenId: ordenArea.ordenId,
-    cantidad: 1,
-    horas_trabajadas: horas,
-    costo_unitario: tarifa,
-    monto,
-    nota: `Mano de obra área "${ordenArea.area}" — ${ordenArea.mecanico || 's/m'}`,
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 2. Captura desde SolicitudRepuesto
+// 1. Captura desde SolicitudRepuesto
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -337,7 +323,7 @@ export async function ensureLocalGastoForRepuesto(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Captura desde SolicitudExterno
+// 2. Captura desde SolicitudExterno
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -379,9 +365,9 @@ export async function ensureLocalGastoForExterno(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Recorre todas las solicitudes y áreas de órdenes aún no cerradas, y
- * garantiza que tengan su Gasto local. Útil al migrar o tras restaurar
- * copias de seguridad. NO elimina gastos históricos.
+ * Recorre todas las solicitudes (repuestos y externos) de órdenes aún no
+ * cerradas, y garantiza que tengan su Gasto local. Útil al migrar o tras
+ * restaurar copias de seguridad. NO elimina gastos históricos.
  */
 export async function backfillGastosForOpenOrders(): Promise<{
   processed: number;
@@ -426,26 +412,6 @@ export async function backfillGastosForOpenOrders(): Promise<{
     processed++;
     const before = await Gasto.findOne({ where: { idempotency_key: `EXTERNO:${s.id}` } });
     const gasto = await ensureLocalGastoForExterno(s);
-    if (!gasto) {
-      skipped++;
-      continue;
-    }
-    if (before && before.id === gasto.id) updated++;
-    else created++;
-  }
-
-  // Áreas con horas registradas
-  const areas = await OrdenArea.findAll({
-    include: [{ model: OrdenServicio, as: 'orden' }],
-  });
-  for (const a of areas as any[]) {
-    if (!a.orden || a.orden.estado === 'Cerrada') {
-      skipped++;
-      continue;
-    }
-    processed++;
-    const before = await Gasto.findOne({ where: { idempotency_key: `AREA:${a.id}` } });
-    const gasto = await ensureLocalGastoForArea(a);
     if (!gasto) {
       skipped++;
       continue;
@@ -550,6 +516,10 @@ async function ensureMssqlGastosTable(): Promise<void> {
     if (!hasPlaca) {
       await profitSequelize.query(`ALTER TABLE [dbo].[gastos] ADD [placa] VARCHAR(30) NULL`);
     }
+    const hasCoProv = (columns ?? []).some((column: any) => column.name === 'co_prov');
+    if (!hasCoProv) {
+      await profitSequelize.query(`ALTER TABLE [dbo].[gastos] ADD [co_prov] VARCHAR(30) NULL`);
+    }
     mssqlTableEnsured = true;
     return;
   }
@@ -607,8 +577,8 @@ async function upsertGastoToMssql(
     placa: gasto.placa ?? null,
     codigo_articulo: gasto.codigo_articulo ?? null,
     codigo_subalmacen: gasto.codigo_subalmacen ?? null,
-    co_cli: gasto.co_cli ?? null,
-    co_prov: gasto.co_prov ?? 'GEN',
+    co_cli: defaultCliente(gasto.co_cli),
+    co_prov: defaultProveedor(gasto.co_prov),
     fecha_actividad: gasto.fecha_actividad ?? new Date(),
     cantidad: gasto.cantidad ?? 0,
     unidad: gasto.unidad ?? null,
@@ -643,7 +613,25 @@ async function upsertGastoToMssql(
         INSERT (${colList}) VALUES (${placeholderList});
     `;
     const flat = [...values, ...values];
-    await profitSequelize.query(sql, { replacements: flat });
+    try {
+      await profitSequelize.query(sql, { replacements: flat });
+    } catch (err) {
+      const idOrdenserIdx = writeableCols.indexOf('id_ordenser');
+      const hasIdOrdenser = idOrdenserIdx !== -1 && values[idOrdenserIdx] !== null && values[idOrdenserIdx] !== undefined;
+      if (!hasIdOrdenser) {
+        throw err;
+      }
+      const valuesNoOrd = [...values];
+      valuesNoOrd[idOrdenserIdx] = null;
+      try {
+        await profitSequelize.query(sql, { replacements: [...valuesNoOrd, ...valuesNoOrd] });
+        logger.warn(
+          `[GastosService] MERGE falló por trigger placom (INSERT PLACOM duplicado en AD_TRANS); reintentado con id_ordenser=NULL para gasto ${gasto.id}. Pendiente corregir el SP InsertarPlacomCompletoDesdeSolicitudOrden en Profit.`
+        );
+      } catch {
+        throw err;
+      }
+    }
     return { updated: false };
   }
 
@@ -884,7 +872,6 @@ export async function syncOneGastoToMssql(gastoId: number): Promise<SyncReport> 
 export default {
   findArticuloEspejo,
   validateGastoDraft,
-  ensureLocalGastoForArea,
   ensureLocalGastoForRepuesto,
   ensureLocalGastoForExterno,
   ensureLocalGastoForSolicitud, // alias legacy

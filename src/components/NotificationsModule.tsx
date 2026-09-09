@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Mail, Send, CheckCircle, Smartphone, RefreshCw } from 'lucide-react';
+import { Bell, Mail, Send, Smartphone, RefreshCw } from 'lucide-react';
+import { useToast } from './Toast';
 
 export const NotificationsModule: React.FC = () => {
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [emailForm, setEmailForm] = useState({
@@ -10,7 +12,6 @@ export const NotificationsModule: React.FC = () => {
     mensaje: 'Se ha registrado una solicitud de repuesto para la unidad A12BC3D que supera el umbral de $500.00.',
   });
   const [sending, setSending] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     fetchNotifications();
@@ -60,17 +61,16 @@ export const NotificationsModule: React.FC = () => {
       if (contentType.includes('application/json')) {
         const data = await res.json();
         if (data.success) {
-          setToast('Notificación por correo electrónico enviada y registrada con éxito.');
+          toast('Notificación por correo electrónico enviada y registrada con éxito.', 'success');
           fetchNotifications();
         } else {
-          alert(data.error || 'Error al enviar notificación');
+          toast(data.error || 'Error al enviar notificación', 'error');
         }
       }
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, 'error');
     } finally {
       setSending(false);
-      setTimeout(() => setToast(null), 4000);
     }
   };
 
@@ -88,25 +88,18 @@ export const NotificationsModule: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
-        setToast('Notificación Push emitida a los dispositivos suscritos.');
+        toast('Notificación Push emitida a los dispositivos suscritos.', 'success');
         fetchNotifications();
       }
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, 'error');
     } finally {
       setSending(false);
-      setTimeout(() => setToast(null), 4000);
     }
   };
 
   return (
     <div className="space-y-6">
-      {toast && (
-        <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-emerald-600" /> {toast}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Formulario de Envío */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">

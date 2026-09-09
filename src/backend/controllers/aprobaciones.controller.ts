@@ -112,7 +112,11 @@ export class AprobacionesController {
           const stockDisponible = articulo ? articulo.stock : 0;
           solicitud.stockActual = stockDisponible;
 
-          if (stockDisponible >= solicitud.cant) {
+          // Los artículos de tipo servicio ('S') no dependen de inventario: se
+          // aprueban aunque el stock sea 0. El resto mantiene la lógica de stock.
+          const esServicio = articulo && String(articulo.tipo ?? '').trim().toUpperCase() === 'S';
+
+          if (esServicio || stockDisponible >= solicitud.cant) {
             solicitud.estadoEntrega = 'Por entregar';
           } else {
             // Sin stock suficiente -> Marcar Backorder y generar requisición ERP

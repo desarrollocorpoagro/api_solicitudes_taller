@@ -6,6 +6,7 @@ import { AuditService } from '../services/audit.service';
 import { logger } from '../utils/logger';
 import { whereTrimCod } from '../utils/trimWhere';
 import { getTenantContext, getAuthorizedPlatesForTenant } from '../utils/tenantHelper';
+import { TENANT_ISOLATION_ENABLED } from '../config/featureFlags';
 
 export class AlmacenController {
   /**
@@ -20,7 +21,7 @@ export class AlmacenController {
         where.ordenId = ordenId;
       } else {
         const tenant = await getTenantContext(req);
-        if (tenant) {
+        if (TENANT_ISOLATION_ENABLED && tenant) {
           const authorizedPlates = await getAuthorizedPlatesForTenant(req);
           const tenantOrders = await OrdenServicio.findAll({
             where: {
@@ -57,7 +58,7 @@ export class AlmacenController {
   static async confirmarDespacho(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const despachadoPor = req.user?.email || 'Almacenista TLL-01';
+      const despachadoPor = req.user?.email || 'Almacenista 01';
 
       const solicitud = await SolicitudRepuesto.findByPk(id);
       if (!solicitud) return res.status(404).json({ success: false, error: 'Solicitud no encontrada.' });
@@ -73,9 +74,12 @@ export class AlmacenController {
         return res.status(400).json({ success: false, error: 'El repuesto ya ha sido despachado previamente.' });
       }
 
-      // Actualizar existencias en catálogo
+      // Actualizar existencias en catálogo. Los artículos de tipo servicio ('S')
+      // no dependen de inventario: no se valida stock ni se descuenta, y no se
+      // genera movimiento ERP de inventario.
       const articulo = await CatalogoRepuesto.findOne({ where: whereTrimCod(solicitud.cod) });
-      if (articulo) {
+      const esServicio = articulo && String(articulo.tipo ?? '').trim().toUpperCase() === 'S';
+      if (articulo && !esServicio) {
         if (articulo.stock < solicitud.cant) {
           return res.status(400).json({
             success: false,
@@ -86,8 +90,8 @@ export class AlmacenController {
         await articulo.save();
       }
 
-      // Generar movimiento de salida conciliado en ERP Profit Plus
-      const numMovimiento = await ErpService.generateInventoryAdjustment(solicitud.cod, solicitud.cant, solicitud.ordenId);
+      // Generar movimiento de salida conciliado en ERP Profit Plus (solo repuestos físicos)
+      let numMovimiento = esServicio ? undefined : await ErpService.generateInventoryAdjustment(solicitud.cod, solicitud.cant, solicitud.ordenId);
 
       solicitud.estadoEntrega = 'Entregado';
       solicitud.numMovimientoERP = numMovimiento;
@@ -103,11 +107,11 @@ export class AlmacenController {
         fieldName: 'estadoEntrega',
         previousValue: 'Por entregar',
         newValue: 'Entregado',
-        description: `Despacho de almacén: Entrega física de ${solicitud.cod} ("${solicitud.desc}") × ${solicitud.cant} unid. Conciliación ERP: Movimiento #${numMovimiento}. Despachador: ${despachadoPor}`,
+        description: `Despacho de almacén: Entrega física de ${solicitud.cod} ("${solicitud.desc}") × ${solicitud.cant} unid.${numMovimiento ? ` Conciliación ERP: Movimiento #${numMovimiento}.` : ' Artículo de servicio sin movimiento de inventario.'} Despachador: ${despachadoPor}`,
         req,
       });
 
-      logger.info(`[AlmacenController] Despacho confirmado para repuesto ${solicitud.cod} (Movimiento: ${numMovimiento})`);
+      logger.info(`[AlmacenController] Despacho confirmado para repuesto ${solicitud.cod}${numMovimiento ? ` (Movimiento: ${numMovimiento})` : ' (artículo de servicio, sin movimiento de inventario)'}`);
 
       return res.json({
         success: true,

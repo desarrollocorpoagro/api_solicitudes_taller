@@ -4,16 +4,15 @@ import { Gasto, GastoOrigen } from '../models/Gasto.model';
 import { OrdenServicio, SolicitudRepuesto, SolicitudExterno } from '../models';
 import {
   backfillGastosForOpenOrders,
+  defaultCliente,
   ensureLocalGastoForSolicitud,
   ensureLocalGastoForRepuesto,
   ensureLocalGastoForExterno,
-  ensureLocalGastoForArea,
   syncGastosToMssql,
   syncOneGastoToMssql,
   validateGastoDraft,
   resolveFlotaOrdenId,
 } from '../services/gastos.service';
-import { OrdenArea } from '../models/OrdenArea.model';
 import { logger } from '../utils/logger';
 
 export class GastosController {
@@ -21,7 +20,7 @@ export class GastosController {
    * Lista los gastos locales con filtros opcionales:
    *   - synced=true|false  (alias retrocompatible; equivale a estado_sincronizacion)
    *   - estado=PENDIENTE|ENVIADO|ERROR
-   *   - tipo_origen=AREA|REPUESTO|EXTERNO
+   *   - tipo_origen=REPUESTO|EXTERNO
    *   - ordenId=...
    *   - id_origen_referencia=...
    *   - limit (default 100, max 500)
@@ -84,10 +83,6 @@ export class GastosController {
         const s = await SolicitudExterno.findByPk(draft.id_origen_referencia);
         if (!s) return res.status(404).json({ success: false, error: 'SolicitudExterno no encontrada.' });
         gasto = await ensureLocalGastoForExterno(s, { usuario: draft.usuario ?? req.user?.email });
-      } else if (draft.tipo_origen === 'AREA' && draft.id_origen_referencia) {
-        const a = await OrdenArea.findByPk(draft.id_origen_referencia);
-        if (!a) return res.status(404).json({ success: false, error: 'OrdenArea no encontrada.' });
-        gasto = await ensureLocalGastoForArea(a);
       } else {
         // Fallback: inserción directa con el draft
         gasto = await Gasto.create({
@@ -96,8 +91,8 @@ export class GastosController {
           ordenId: draft.ordenId,
           codigo_articulo: draft.codigo_articulo ?? null,
           codigo_subalmacen: String(draft.codigo_subalmacen ?? '').trim() || '01',
-          co_prov: draft.co_prov ?? 'GEN',
-          co_cli: draft.co_cli ?? null,
+          co_prov: String(draft.co_prov ?? '').trim() || 'GEN',
+          co_cli: defaultCliente(draft.co_cli),
           cantidad: Number(draft.cantidad ?? 0),
           unidad: draft.unidad ?? null,
           horas_trabajadas: Number(draft.horas_trabajadas ?? 0),
@@ -135,21 +130,16 @@ export class GastosController {
   /**
    * Re-genera (idempotente) el gasto local de una solicitud específica.
    * Compatibilidad retrocompatible: /gastos/regenerate/:solicitudId
-   * Para SolicitudRepuesto — se aceptan también los ids de SolicitudExterno y
-   * OrdenArea como path param (la lógica se infiere del tipo de origen).
+   * Para SolicitudRepuesto — se aceptan también los ids de SolicitudExterno
+   * (la lógica se infiere del tipo de origen).
    */
   static async regenerate(req: Request, res: Response) {
     try {
       const { id: referenciaId } = req.params;
-      const { tipo } = req.query; // opcional: AREA | REPUESTO | EXTERNO
-      const ordenIdHint = String(req.query.ordenId ?? '');
+      const { tipo } = req.query; // opcional: REPUESTO | EXTERNO
 
-      // Intentar deducir el tipo probando las tres tablas
+      // Intentar deducir el tipo probando las dos tablas
       let gasto: any = null;
-      if (tipo === 'AREA' || (!tipo && ordenIdHint)) {
-        const a = await OrdenArea.findByPk(referenciaId);
-        if (a) gasto = await ensureLocalGastoForArea(a);
-      }
       if (!gasto && (tipo === 'REPUESTO' || !tipo)) {
         const s = await SolicitudRepuesto.findByPk(referenciaId);
         if (s) gasto = await ensureLocalGastoForRepuesto(s, {
@@ -164,7 +154,7 @@ export class GastosController {
       if (!gasto) {
         return res.status(404).json({
           success: false,
-          error: 'No se encontró la referencia en SolicitudRepuesto, SolicitudExterno ni OrdenArea.',
+          error: 'No se encontró la referencia en SolicitudRepuesto ni SolicitudExterno.',
         });
       }
       // Sync por evento

@@ -58,19 +58,13 @@ function normalizeFlotaRow(row: FlotaMirrorRow) {
 
 export class FlotaController {
   /**
-   * Obtiene la lista de la flota vehicular correspondiente a la empresa activa (Tenant).
+   * Obtiene la lista de la flota vehicular (sin filtrar por empresa propietaria:
+   * la búsqueda de placa no se limita por el campo Empresa_Propietaria).
    * Lee desde la tabla espejo `flota_vehiculos` que es donde MasterSyncService
    * deposita la información proveniente de MSSQL Profit AD_TRANS.
    */
   static async getAllFlota(req: Request, res: Response) {
     try {
-      const tenant = await getTenantContext(req);
-      const params: any[] = [];
-      let where = '';
-      if (tenant) {
-        where = 'WHERE (LOWER(LTRIM(RTRIM(Empresa_Propietaria))) = LOWER(LTRIM(RTRIM(?))))';
-        params.push(tenant.companyName);
-      }
       const [rows]: any = await profitMirrorSequelize.query(
         `SELECT Placa, placa_anterior, Empresa_Propietaria, Marca, Modelo, color, Año, clase, Tipo,
                 Carga_max_kg, Carga_max_lts, Serial_carroceria1, Serial_carroceria2, Serial_Motor,
@@ -81,9 +75,7 @@ export class FlotaController {
                 nro_ROTC, fec_venc_ROTC, nro_RACDA, fec_venc_RACDA,
                 nro_gps1, nro_gps2, nro_ejes, calibracion, venc_calibrac, tara, funcion, division, activo
          FROM flota_vehiculos
-         ${where}
-         ORDER BY Placa ASC`,
-        { replacements: params }
+         ORDER BY Placa ASC`
       );
       const flota = (rows || []).map((r: FlotaMirrorRow) => normalizeFlotaRow(r));
       return res.json({ success: true, count: flota.length, data: flota });
@@ -93,13 +85,13 @@ export class FlotaController {
   }
 
   /**
-   * Obtiene los datos de una unidad por su placa, validando pertenencia a la empresa activa.
+   * Obtiene los datos de una unidad por su placa. La búsqueda NO se limita por
+   * el campo Empresa_Propietaria: cualquier placa se resuelve en el maestro.
    */
   static async getFlotaByPlaca(req: Request, res: Response) {
     try {
       const { placa } = req.params;
       const cleanPlaca = placa.toUpperCase().trim();
-      const tenant = await getTenantContext(req);
 
       const [rows]: any = await profitMirrorSequelize.query(
         `SELECT Placa, placa_anterior, Empresa_Propietaria, Marca, Modelo, color, Año, clase, Tipo,
@@ -123,22 +115,6 @@ export class FlotaController {
           error: `Placa ${cleanPlaca} no encontrada en el maestro de flota. Verifique el código o registre la unidad.`,
           code: 'FLEET_NOT_FOUND',
         });
-      }
-
-      // Validar aislamiento multi-tenant si hay un contexto de empresa activa
-      if (tenant) {
-        const vehicleCompany = (unidad.empresa || '').toString();
-        const matchesName = vehicleCompany.toLowerCase() === tenant.companyName.toLowerCase();
-        if (!matchesName) {
-          logger.warn(`[FlotaController] Acceso denegado: Placa ${cleanPlaca} (${vehicleCompany}) no pertenece a empresa activa (${tenant.companyName})`);
-          return res.status(403).json({
-            success: false,
-            error: `Acceso denegado por aislamiento de empresa: La unidad con placa ${cleanPlaca} pertenece a "${vehicleCompany}" y no puede ser gestionada desde "${tenant.companyName}".`,
-            code: 'TENANT_ISOLATION_VIOLATION',
-            vehicleCompany,
-            activeCompany: tenant.companyName,
-          });
-        }
       }
 
       // Reincidencia detectada si tiene historial previo

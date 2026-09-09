@@ -17,7 +17,7 @@ export class RepuestosController {
   private static async resolveArticuloDesdeMirror(cod: string): Promise<CatalogoRepuesto | null> {
     const [rows]: any = await profitMirrorSequelize.query(
       `SELECT TRIM(codigo_profit) AS cod, TRIM(nombre_producto) AS descr,
-              costo, codigo_subalmacen, sub_almacen, almacen, categoria, stock_act
+              costo, codigo_subalmacen, sub_almacen, almacen, categoria, stock_act, tipo
        FROM vw_flota_articulos
        WHERE LTRIM(RTRIM(codigo_profit)) = LTRIM(RTRIM(?))`,
       { replacements: [cod] }
@@ -48,7 +48,8 @@ export class RepuestosController {
         categoria: primerFila.categoria || 'General',
         stock,
         costo: Number(primerFila.costo ?? 0),
-        almacen: tieneSubCentral && stock === 0 ? '00' : String(primerFila.almacen ?? primerFila.sub_almacen ?? 'ALM-01').trim(),
+        almacen: tieneSubCentral && stock === 0 ? '00' : String(primerFila.almacen ?? primerFila.sub_almacen ?? '01').trim(),
+        tipo: String(primerFila.tipo ?? '').trim(),
       },
     });
     if (!created) {
@@ -91,14 +92,19 @@ export class RepuestosController {
         return res.status(400).json({ success: false, error: 'El artículo tiene codigo_subalmacen=00, debe solicitar traslado al central.' });
       }
 
-      const cantidad = parseInt(cant, 10);
+      // Los artículos de tipo servicio ('S') no dependen de inventario: se pueden
+      // solicitar aunque el stock sea 0 y su cantidad se fuerza a 1. El resto
+      // mantiene la lógica de stock.
+      const esServicio = String(articulo.tipo ?? '').trim().toUpperCase() === 'S';
+
+      const cantidad = esServicio ? 1 : parseInt(cant, 10);
       const costoUnitario = parseFloat(Number(articulo.costo).toFixed(2));
       const costoTotal = parseFloat((cantidad * costoUnitario).toFixed(2));
       const requiereEscalamiento = costoTotal > 5000;
 
       // Aprobación automática: la solicitud nace aprobada según el stock disponible.
       const aprobadoPor = (req as any).user?.email || 'Aprobación automática';
-      const stockSuficiente = Number(articulo.stock) >= cantidad;
+      const stockSuficiente = esServicio ? true : Number(articulo.stock) >= cantidad;
       let numRequisicionERP: string | undefined;
       if (!stockSuficiente) {
         numRequisicionERP = await ErpService.generatePurchaseRequisition(articulo.cod.trim(), cantidad, ordenId);
@@ -116,16 +122,18 @@ export class RepuestosController {
         stockActual: articulo.stock,
         motivo: motivo || '',
         estadoAprobacion: 'Aprobada',
-        estadoEntrega: stockSuficiente ? 'Por entregar' : 'Backorder',
+        estadoEntrega: esServicio ? 'Entregado' : (stockSuficiente ? 'Por entregar' : 'Backorder'),
         almacen: articulo.almacen || '01',
         aprobadoPor,
         fechaAprobacion: new Date(),
+        despachadoPor: esServicio ? aprobadoPor : undefined,
+        fechaDespacho: esServicio ? new Date() : undefined,
         numRequisicionERP: numRequisicionERP || undefined,
         requiereEscalamiento,
       });
 
-      // Si supera el umbral, notificar al responsable de flota
-      if (requiereEscalamiento) {
+      // Supera el umbral de escalamiento solo si no fue un despacho inmediato de servicio
+      if (requiereEscalamiento && !esServicio) {
         EmailService.notifyEscalamientoFlota(articulo.desc, costoTotal, ordenId, otId);
       }
 
@@ -136,15 +144,17 @@ export class RepuestosController {
         action: 'SOLICITUD_REPUESTO',
         fieldName: 'repuesto',
         newValue: `${articulo.cod} (${cantidad} unid)`,
-        description: `Solicitud de repuesto ${articulo.cod} ("${articulo.desc}") × ${cantidad} unid. Costo estimado: $${costoTotal} ($${costoUnitario}/u). Motivo: "${motivo || 'Requerimiento técnico'}"`,
+        description: `Solicitud de repuesto ${articulo.cod} ("${articulo.desc}") × ${cantidad} unid. Costo estimado: $${costoTotal} ($${costoUnitario}/u). Motivo: "${motivo || 'Requerimiento técnico'}"${esServicio ? '. Despacho inmediato: artículo de servicio sin dependencia de inventario.' : ''}`,
         req,
       });
 
-      logger.info(`[RepuestosController] Solicitud de repuesto creada y aprobada automáticamente: ${articulo.cod} x ${cantidad} para ${ordenId} (${otId})`);
+      logger.info(`[RepuestosController] Solicitud de repuesto creada y aprobada automáticamente: ${articulo.cod} x ${cantidad} para ${ordenId} (${otId})${esServicio ? ' [Despacho inmediato]' : ''}`);
 
       return res.status(201).json({
         success: true,
-        message: 'Solicitud de repuesto agregada y aprobada automáticamente.',
+        message: esServicio
+          ? 'Solicitud de repuesto (servicio) agregada y despachada inmediatamente.'
+          : 'Solicitud de repuesto agregada y aprobada automáticamente.',
         data: solicitud,
       });
     } catch (error: any) {

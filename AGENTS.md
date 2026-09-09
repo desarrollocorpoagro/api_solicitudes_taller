@@ -25,6 +25,7 @@ Guía compacta para trabajar en `api_solicitudes_taller` (Plataforma Taller Grup
 - Patrón de selección de fuente: `profitSequelize.getDialect() === 'mssql' ? '[AD_TRANS].[dbo].[...]' : '...'` (ver `resolveFlotaOrdenId` en `gastos.service.ts`).
 - La UI alimenta catálogo/sync desde la **vista espejo** `vw_flota_articulos` (≈910 filas), no desde `CatalogoRepuesto` (≈80 filas, subset sincronizado). Códigos válidos solo en el espejo devuelven **404 en repuestos**; resolverlos con `RepuestosController.resolveArticuloDesdeMirror` (auto-registro en `CatalogoRepuesto`), ya aplicado en `repuestos.controller.ts`.
 - Códigos con padding: usar `whereTrimCod` (`src/backend/utils/trimWhere.ts`) para buscar por `TRIM(cod)`.
+- **Trigger MSSQL en `dbo.gastos`**: `trg_gastos_AfterInsert_InsertarPlacom` (AFTER INSERT) ejecuta `InsertarPlacomCompletoDesdeSolicitudOrden @gasto_id=id_ordenser` por cada fila con `id_ordenser` no nulo. Si ese SP falla (p.ej. PK duplicado en `placom.fact_num` o `RAISERROR`), **aborta el INSERT del gasto** y Sequelize a menudo reporta `message=''` (vacío) — no es error de red. Workaround aplicado en `upsertGastoToMssql`: si el MERGE falla, reintenta 1 vez con `id_ordenser=NULL` (el trigger filtra `IS NOT NULL`); el gasto se sincroniza pero pierde la cascada a placom/ajuste.
 
 ## Convenciones backend
 - Controladores = clases con métodos `static` (patrón en `src/backend/controllers/*`). Rutas por dominio en `routes/*`. Validación Joi en `validations/schemas.ts`.

@@ -15,6 +15,7 @@ import {
   Server,
   Zap,
 } from 'lucide-react';
+import { useToast } from './Toast';
 
 interface SyncStatusData {
   isOnline: boolean;
@@ -52,13 +53,13 @@ interface SyncStatusBadgeProps {
 }
 
 export default function SyncStatusBadge({ token }: SyncStatusBadgeProps) {
+  const { toast } = useToast();
   const [status, setStatus] = useState<SyncStatusData | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [queueItems, setQueueItems] = useState<SyncQueueItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<SyncQueueItem | null>(null);
   const [loadingQueue, setLoadingQueue] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchStatus = async () => {
     try {
@@ -117,17 +118,16 @@ export default function SyncStatusBadge({ token }: SyncStatusBadgeProps) {
       });
       const data = await res.json();
       if (data.success) {
-        setToastMessage(`Sincronización exitosa: ${data.data?.outboundSynced || 0} enviadas, ${data.data?.inboundSynced || 0} recibidas.`);
+        toast(`Sincronización exitosa: ${data.data?.outboundSynced || 0} enviadas, ${data.data?.inboundSynced || 0} recibidas.`, 'success');
         fetchStatus();
         if (isModalOpen) fetchQueue();
       } else {
-        setToastMessage(`Aviso: ${data.data?.message || data.error || 'No se pudo sincronizar con MSSQL.'}`);
+        toast(`Aviso: ${data.data?.message || data.error || 'No se pudo sincronizar con MSSQL.'}`, 'error');
       }
     } catch (err: any) {
-      setToastMessage(`Error: ${err.message}`);
+      toast(`Error: ${err.message}`, 'error');
     } finally {
       setIsSyncing(false);
-      setTimeout(() => setToastMessage(null), 4000);
     }
   };
 
@@ -146,13 +146,11 @@ export default function SyncStatusBadge({ token }: SyncStatusBadgeProps) {
       const data = await res.json();
       if (data.success) {
         setStatus(data.data);
-        setToastMessage(targetState ? '🟠 Modo Autónomo (Offline-First) Activado' : '🟢 Enlace con MSSQL Restablecido');
+        toast(targetState ? '🟠 Modo Autónomo (Offline-First) Activado' : '🟢 Enlace con MSSQL Restablecido', 'info');
         if (isModalOpen) fetchQueue();
       }
     } catch (err: any) {
-      setToastMessage(`Error: ${err.message}`);
-    } finally {
-      setTimeout(() => setToastMessage(null), 4000);
+      toast(`Error: ${err.message}`, 'error');
     }
   };
 
@@ -165,14 +163,12 @@ export default function SyncStatusBadge({ token }: SyncStatusBadgeProps) {
       });
       const data = await res.json();
       if (data.success) {
-        setToastMessage(data.message || 'Operaciones re-encoladas');
+        toast(data.message || 'Operaciones re-encoladas', 'info');
         fetchStatus();
         fetchQueue();
       }
     } catch (err: any) {
-      setToastMessage(`Error: ${err.message}`);
-    } finally {
-      setTimeout(() => setToastMessage(null), 4000);
+      toast(`Error: ${err.message}`, 'error');
     }
   };
 
@@ -181,17 +177,6 @@ export default function SyncStatusBadge({ token }: SyncStatusBadgeProps) {
 
   return (
     <>
-      {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="fixed bottom-4 right-4 z-50 bg-[#002244] text-white px-4 py-3 rounded-lg shadow-2xl border border-[var(--lime)]/50 flex items-center gap-3 animate-fade-in text-xs">
-          <Zap className="w-4 h-4 text-[var(--lime)] shrink-0" />
-          <span>{toastMessage}</span>
-          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-white ml-2">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
       {/* Badge en Barra Superior */}
       <div className="flex items-center gap-2">
         <button

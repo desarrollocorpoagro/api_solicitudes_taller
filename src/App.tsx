@@ -28,6 +28,7 @@ import TestConsoleModule from './components/TestConsoleModule';
 import SyncStatusBadge from './components/SyncStatusBadge';
 import RoleSimulatorBar from './components/RoleSimulatorBar';
 import SanLuisLogo from './components/SanLuisLogo';
+import { ToastProvider } from './components/Toast';
 
 // ─── Tipos del menú jerárquico ────────────────────────────────────────────────
 export type ModuleId =
@@ -339,10 +340,15 @@ export default function App() {
 
   // Si no hay sesión activa, mostrar la pantalla de Login
   if (!token || !user || !activeCompany) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <ToastProvider>
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      </ToastProvider>
+    );
   }
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col font-['Rubik']">
       {/* Top Header Corporativo Grupo San Luis */}
       <header className="topbar">
@@ -488,5 +494,6 @@ export default function App() {
         </div>
       </footer>
     </div>
+    </ToastProvider>
   );
 }

@@ -106,7 +106,7 @@ export const SYSTEM_ROLES: SystemRoleDef[] = [
     role: 'ALMACENISTA',
     label: 'Almacenista',
     email: 'almacen@empresasanluis.com',
-    name: 'Pedro Morales (Almacén TLL-01)',
+    name: 'Pedro Morales (Almacén 01)',
     icon: Package,
     color: '#16a34a',
     badgeBg: '#dcfce7',

@@ -13,7 +13,7 @@ export interface OrdenServicioAttributes {
   esReincidencia: boolean;
   osAnterior?: string;
   motivoReincidencia?: string;
-  estado: 'Abierta' | 'En Proceso' | 'Cerrada';
+  estado: 'Abierta' | 'En Proceso' | 'Cerrada' | 'Anulada';
   fechaApertura: Date;
   fechaEntrega?: Date;
   recibeConforme?: string;
@@ -39,7 +39,7 @@ export class OrdenServicio extends Model<OrdenServicioAttributes, OrdenServicioC
   public esReincidencia!: boolean;
   public osAnterior!: string;
   public motivoReincidencia!: string;
-  public estado!: 'Abierta' | 'En Proceso' | 'Cerrada';
+  public estado!: 'Abierta' | 'En Proceso' | 'Cerrada' | 'Anulada';
   public fechaApertura!: Date;
   public fechaEntrega!: Date;
   public recibeConforme!: string;

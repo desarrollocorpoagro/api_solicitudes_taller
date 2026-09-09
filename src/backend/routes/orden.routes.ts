@@ -4,7 +4,7 @@ import { OrdenAreaController } from '../controllers/ordenArea.controller';
 import { RepuestosController } from '../controllers/repuestos.controller';
 import { ExternosController } from '../controllers/externos.controller';
 import { validateJoi } from '../middlewares/validate.middleware';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, requireRoles } from '../middlewares/auth.middleware';
 import {
   createOrdenServicioSchema,
   cerrarOrdenServicioSchema,
@@ -25,6 +25,7 @@ router.post('/', validateJoi(createOrdenServicioSchema), OrdenController.createO
 router.get('/', OrdenController.getAllOrdenes);
 router.get('/:id', OrdenController.getOrdenById);
 router.put('/:id', OrdenController.updateOrden);
+router.delete('/:id', requireRoles(['ADMIN', 'GERENTE_TALLER']), OrdenController.anularOrden);
 router.post('/:id/cerrar', validateJoi(cerrarOrdenServicioSchema), OrdenController.cerrarOrden);
 
 // 1.1 Bitácora de Auditoría y Trazabilidad Operativa

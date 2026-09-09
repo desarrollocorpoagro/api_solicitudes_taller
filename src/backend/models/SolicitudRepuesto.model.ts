@@ -124,7 +124,7 @@ SolicitudRepuesto.init(
     almacen: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      defaultValue: 'TLL-01',
+      defaultValue: '01',
     },
     numMovimientoERP: {
       type: DataTypes.STRING(50),

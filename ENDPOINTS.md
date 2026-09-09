@@ -248,7 +248,7 @@ El servidor arranca un **sincronizador periódico cada 60s** que invoca `syncGas
 ## 5. Catálogo de Repuestos y Sincronización ERP
 
 ### `GET /api/v1/catalogo`
-- **Descripción**: Devuelve el catálogo maestro de repuestos (códigos, descripción, stock disponible en almacén `TLL-01`, costo unitario y categoría). Incluye timestamp de sincronización con el ERP Profit Plus.
+- **Descripción**: Devuelve el catálogo maestro de repuestos (códigos, descripción, stock disponible en almacén `01`, costo unitario y categoría). Incluye timestamp de sincronización con el ERP Profit Plus.
 
 ### `PUT /api/v1/catalogo/:cod/stock`
 - **Descripción**: Actualiza existencias o costos de un repuesto específico tras una entrada de almacén o conciliación contable.
@@ -353,7 +353,7 @@ El servidor arranca un **sincronizador periódico cada 60s** que invoca `syncGas
 ## 11. Despacho de Almacén y Movimientos ERP
 
 ### `GET /api/v1/almacen/despachos`
-- **Descripción**: Lista todos los repuestos aprobados que se encuentran pendientes de entrega física en el mostrador del almacén `TLL-01`.
+- **Descripción**: Lista todos los repuestos aprobados que se encuentran pendientes de entrega física en el mostrador del almacén `01`.
 
 ### `POST /api/v1/almacen/despachos/:id`
 - **Descripción**: Confirma la entrega del repuesto al mecánico, descuenta las existencias del inventario y genera el correlativo de movimiento de ajuste de inventario (`AJS-XXXX`) en el ERP.
